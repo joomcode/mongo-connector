@@ -527,7 +527,7 @@ def get_config_options():
 
     do_oplog_dump = add_option(
         config_key="doOplogDump",
-        default=False,
+        default=True,
         type=bool)
     do_oplog_dump.add_cli(
         "--do-oplog-dump", action="store_true", help=
