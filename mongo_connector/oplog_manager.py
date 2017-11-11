@@ -131,8 +131,8 @@ class OplogThread(threading.Thread):
 
         self.do_oplog_dump = kwargs.get('do_oplog_dump')
         self.oplog_dump_file_name = kwargs.get('oplog_dump_file_name')
-        self.oplog_dump_file_w = open(self.oplog_dump_file_name, "ba")
-        self.oplog_dump_file_r = open(self.oplog_dump_file_name, "br")
+        self.oplog_dump_file_w = open(self.oplog_dump_file_name, "ab")
+        self.oplog_dump_file_r = open(self.oplog_dump_file_name, "rb")
         # Timestamp of last exported oplog entry
         self.last_ts = None
         # Last exported oplog entry from disk must be this number of seconds
