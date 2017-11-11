@@ -51,3 +51,8 @@ DEFAULT_LOG_FORMAT = (
 DEFAULT_META_COLLECTION_NAME = "__oplog"
 # If a single meta collection is used, defines the default cap size
 DEFAULT_META_COLLECTION_CAP_SIZE = 5 * 1024 * 1024
+
+# The minimum time in seconds last exported oplog entry from disk
+# should be ahead of oldest mongo oplog entry to switch reading
+# from disk to reading from mongo cursor.
+DEFAULT_MIN_AHEAD_TIME = 1

@@ -127,11 +127,18 @@ class OplogThread(threading.Thread):
         self.replset_name = (
             self.primary_client.admin.command('ismaster')['setName'])
 
-        self.oplog_dump_file_name = "data/oplog.pkl"
+        self.cursor = None
+
+        self.do_oplog_dump = kwargs.get('do_oplog_dump')
+        self.oplog_dump_file_name = kwargs.get('oplog_dump_file_name')
         self.oplog_dump_file_w = open(self.oplog_dump_file_name, "ba")
-        self.oplog_dump_file = open(self.oplog_dump_file_name, "br")
-        self.minAheadTime = 1000
+        self.oplog_dump_file_r = open(self.oplog_dump_file_name, "br")
+        # Timestamp of last exported oplog entry
         self.last_ts = None
+        # Last exported oplog entry from disk must be this number of seconds
+        # ahead of last oplog entry to switch from disk to mongo cursor
+        self.min_ahead_time = kwargs.get('min_ahead_time')
+        # Boolean describing wheather or not the oplog dump thread is running
         self.oplog_dump_running = False
 
         if not self.oplog.find_one():
@@ -229,38 +236,36 @@ class OplogThread(threading.Thread):
             t = threading.Thread(target=dumpOplogEntries, args=(cursor,))
             t.start()
 
-    def entry_spewer(self, cursor):
-        if cursor is None:
-            behind_oplog, first_time_ahead = True, True
-        else:
-            behind_oplog, first_time_ahead = False, False
+    def entry_spewer(self):
+        def ahead_enough():
+            if self.last_ts is None:
+                return False
+
+            oldest_oplog_ts = self.get_oldest_oplog_timestamp()
+            oldest_oplog_ts_long = util.bson_ts_to_long(oldest_oplog_ts)
+            last_ts_long = util.bson_ts_to_long(self.last_ts)
+            ahead_of_oldest_oplog_time = last_ts_long - oldest_oplog_ts_long
+            ahead_of_oldest_oplog_time >>= 32
+            if ahead_of_oldest_oplog_time >= self.min_ahead_time:
+                return True
+
+            return False
 
         while True:
-            if behind_oplog and self.last_ts is not None:
-                oldest_ts = self.get_oldest_oplog_timestamp()
-                oldest_ts_long = util.bson_ts_to_long(oldest_ts)
-                last_ts_long = util.bson_ts_to_long(self.last_ts)
-
-                ahead_of_last = last_ts_long - oldest_ts_long
-                behind_oplog = ahead_of_last < self.minAheadTime
-
-            if behind_oplog:
-                try:
-                    entry = pickle.load(self.oplog_dump_file)
-                    LOG.debug("Loaded entry from file")
-                except EOFError:
-                    LOG.debug("EOF file entry, caught!")
-                    behind_oplog = False # not sure if it's ok
-            else:
-                if first_time_ahead:
-                    oldest_ts = self.get_oldest_oplog_timestamp()
-                    cursor = self.get_oplog_cursor(oldest_ts)
-                    first_time_ahead = False
+            if self.cursor is None:
+                if ahead_enough():
+                    oldest_oplog_ts = self.get_oldest_oplog_timestamp()
+                    self.cursor = self.get_oplog_cursor(oldest_oplog_ts)
                     self.oplog_dump_running = False
-                if cursor.alive and self.running:
-                    entry = next(cursor)
-                else:
-                    raise StopIteration
+                    continue
+                try:
+                    entry = pickle.load(self.oplog_dump_file_r)
+                except EOFError:
+                    pass
+            elif self.cursor.alive and self.running:
+                entry = next(self.cursor)
+            else:
+                raise StopIteration
 
             yield entry
 
@@ -271,19 +276,25 @@ class OplogThread(threading.Thread):
         ReplicationLagLogger(self, 30).start()
         LOG.debug("OplogThread: Run thread started")
 
-        LOG.debug("OplogThread: Starting oplog dump")
-        self.start_oplog_dump()
+        if self.do_oplog_dump:
+            LOG.debug("OplogThread: Starting oplog dump")
+            self.start_oplog_dump()
 
         while self.running is True:
             LOG.debug("OplogThread: Getting cursor")
-            cursor, cursor_empty = retry_until_ok(self.init_cursor)
+            self.cursor, cursor_empty = retry_until_ok(self.init_cursor)
             # we've fallen too far behind
-            if cursor is None and self.checkpoint is not None:
+            if self.cursor is None and self.checkpoint is not None:
                 err_msg = "OplogThread: Last entry no longer in oplog"
-                effect = "trying to recover with disk!"
+                effect = self.do_oplog_dump and \
+                         "trying to recover with disk!" or \
+                         "cannot recover"
                 LOG.info('%s %s %s' % (err_msg, effect, self.oplog))
+                if not self.do_oplog_dump:
+                    self.running = False
+                    continue
 
-            if cursor is not None and cursor_empty:
+            if self.cursor is not None and cursor_empty:
                 LOG.debug("OplogThread: Last entry is the one we "
                           "already processed.  Up to date.  Sleeping.")
                 time.sleep(1)
@@ -295,10 +306,11 @@ class OplogThread(threading.Thread):
             update_inc = 0
             try:
                 LOG.debug("OplogThread: about to process new oplog entries")
-                while self.running:
+                while (self.cursor is None or self.cursor.alive) and \
+                        self.running:
                     LOG.debug("OplogThread: Cursor is still"
                               " alive and thread is still running.")
-                    for n, entry in enumerate(self.entry_spewer(cursor)):
+                    for n, entry in enumerate(self.entry_spewer()):
                         # Break out if this thread should stop
                         if not self.running:
                             break

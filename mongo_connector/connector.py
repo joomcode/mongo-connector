@@ -199,6 +199,9 @@ class Connector(threading.Thread):
             mongo_address=config['mainAddress'],
             doc_managers=config['docManagers'],
             oplog_checkpoint=os.path.abspath(config['oplogFile']),
+            do_oplog_dump=config['doOplogDump'],
+            oplog_dump_file_name=config['oplogDumpFileName'],
+            min_ahead_time=config['minAheadTime'],
             collection_dump=(not config['noDump']),
             batch_size=config['batchSize'],
             continue_on_error=config['continueOnError'],
@@ -521,6 +524,40 @@ def get_config_options():
         "If specified, this flag will ensure that "
         "mongo_connector won't read the entire contents of a "
         "namespace iff --oplog-ts points to an empty file.")
+
+    do_oplog_dump = add_option(
+        config_key="doOplogDump",
+        default=False,
+        type=bool)
+    do_oplog_dump.add_cli(
+        "--do-oplog-dump", action="store_true", help=
+        "If specified, this flag will ensure that "
+        "mongo_connector will buffer oplog to disk until exporting "
+        "process is ahead enough of last mongo oplog entry."
+    )
+
+    oplog_dump_file_name = add_option(
+        config_key="oplogDumpFileName",
+        default="data/oplog.pkl",
+        type=str)
+    oplog_dump_file_name.add_cli(
+        "--oplog-dump-file-name", help=
+        "Specify a name of a file where oplog is to be dumped. "
+        "Default file name is data/oplog.pkl. "
+        "Use it only if --do-oplog-dump is specified."
+    )
+
+    min_ahead_time = add_option(
+        config_key="minAheadTime",
+        default=constants.DEFAULT_MIN_AHEAD_TIME,
+        type=int)
+    min_ahead_time.add_cli(
+        "--min-ahead-time", type="int", help=
+        "Specify the minimum time in seconds last exported oplog entry "
+        "from disk should be ahead of oldest mongo oplog entry to switch "
+        "reading from disk to reading from mongo cursor. Default is 1. "
+        "Use it only if --do-oplog-dump is specified."
+    )
 
     batch_size = add_option(
         config_key="batchSize",
