@@ -213,6 +213,7 @@ class OplogThread(threading.Thread):
                     skip, is_gridfs_file = self._should_skip_entry(entry)
                     if not skip:
                         pickle.dump(entry, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
+            LOG.always("OplogDump thread finishing. Deleting oplog dump file")
             try:
                 os.remove(self.oplog_dump_file_name)
             except OSError:
@@ -254,6 +255,7 @@ class OplogThread(threading.Thread):
         while True:
             if self.cursor is None:
                 if ahead_enough():
+                    LOG.always("Ahead enough of mongo oldest oplog entry")
                     oldest_oplog_ts = self.get_oldest_oplog_timestamp()
                     self.cursor = self.get_oplog_cursor(oldest_oplog_ts)
                     self.oplog_dump_running = False
@@ -261,10 +263,12 @@ class OplogThread(threading.Thread):
                 try:
                     entry = pickle.load(self.oplog_dump_file_r)
                 except EOFError:
+                    LOG.always("EOF oplog dump")
                     pass
             elif self.cursor.alive and self.running:
                 entry = next(self.cursor)
             else:
+                LOG.always("Entry spewer stop iteration")
                 raise StopIteration
 
             yield entry
@@ -277,11 +281,11 @@ class OplogThread(threading.Thread):
         LOG.debug("OplogThread: Run thread started")
 
         if self.do_oplog_dump:
-            LOG.debug("OplogThread: Starting oplog dump")
+            LOG.always("OplogThread: Starting oplog dump")
             self.start_oplog_dump()
 
         while self.running is True:
-            LOG.debug("OplogThread: Getting cursor")
+            LOG.always("OplogThread: Getting cursor")
             self.cursor, cursor_empty = retry_until_ok(self.init_cursor)
             # we've fallen too far behind
             if self.cursor is None and self.checkpoint is not None:
@@ -289,13 +293,13 @@ class OplogThread(threading.Thread):
                 effect = self.do_oplog_dump and \
                          "trying to recover with disk!" or \
                          "cannot recover"
-                LOG.info('%s %s %s' % (err_msg, effect, self.oplog))
+                LOG.always('%s %s %s' % (err_msg, effect, self.oplog))
                 if not self.do_oplog_dump:
                     self.running = False
                     continue
 
             if self.cursor is not None and cursor_empty:
-                LOG.debug("OplogThread: Last entry is the one we "
+                LOG.always("OplogThread: Last entry is the one we "
                           "already processed.  Up to date.  Sleeping.")
                 time.sleep(1)
                 continue
@@ -305,7 +309,7 @@ class OplogThread(threading.Thread):
             upsert_inc = 0
             update_inc = 0
             try:
-                LOG.debug("OplogThread: about to process new oplog entries")
+                LOG.always("OplogThread: about to process new oplog entries")
                 while (self.cursor is None or self.cursor.alive) and \
                         self.running:
                     LOG.debug("OplogThread: Cursor is still"
@@ -415,12 +419,12 @@ class OplogThread(threading.Thread):
             # update timestamp before attempting to reconnect to MongoDB,
             # after being join()'ed, or if the cursor closes
             if self.last_ts is not None:
-                LOG.debug("OplogThread: updating checkpoint after an "
+                LOG.always("OplogThread: updating checkpoint after an "
                           "Exception, cursor closing, or join() on this"
                           "thread.")
                 self.update_checkpoint(self.last_ts)
 
-            LOG.debug("OplogThread: Sleeping. Documents removed: %d, "
+            LOG.always("OplogThread: Sleeping. Documents removed: %d, "
                       "upserted: %d, updated: %d"
                       % (remove_inc, upsert_inc, update_inc))
             time.sleep(2)
