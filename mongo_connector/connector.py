@@ -538,12 +538,12 @@ def get_config_options():
 
     oplog_dump_file_name = add_option(
         config_key="oplogDumpFileName",
-        default="data/oplog.pkl",
+        default="tmp/oplog.dump",
         type=str)
     oplog_dump_file_name.add_cli(
         "--oplog-dump-file-name", help=
         "Specify a name of a file where oplog is to be dumped. "
-        "Default file name is data/oplog.pkl. "
+        "Default file name is /tmp/oplog.dump. "
         "Use it only if --do-oplog-dump is specified."
     )
 
