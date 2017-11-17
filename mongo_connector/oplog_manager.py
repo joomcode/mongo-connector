@@ -252,6 +252,9 @@ class OplogThread(threading.Thread):
 
             return False
 
+        if self.cursor is None:
+            LOG.always("Oplog is too much ahead. Start reading from oplog dump")
+
         while True:
             if self.cursor is None:
                 if ahead_enough():
