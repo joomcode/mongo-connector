@@ -286,6 +286,7 @@ class OplogThread(threading.Thread):
         if self.do_oplog_dump:
             LOG.always("OplogThread: Starting oplog dump")
             self.start_oplog_dump()
+            LOG.always("OplogThread: Oplog dump started")
 
         while self.running is True:
             LOG.always("OplogThread: Getting cursor")
