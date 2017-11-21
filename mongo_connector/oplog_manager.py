@@ -189,8 +189,8 @@ class OplogThread(threading.Thread):
         # included gridfs namespaces.
         namespace = self.namespace_config.lookup(ns)
         if namespace is None:
-            LOG.debug("OplogThread: Skipping oplog entry: "
-                      "'%s' is not in the namespace configuration." % (ns,))
+            # LOG.debug("OplogThread: Skipping oplog entry: "
+            #           "'%s' is not in the namespace configuration." % (ns,))
             return True, False
 
         # Update the namespace.
