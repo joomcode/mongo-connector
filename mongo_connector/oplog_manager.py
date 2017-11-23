@@ -290,7 +290,7 @@ class OplogThread(threading.Thread):
         LOG.debug("OplogThread: Run thread started")
 
         if self.do_oplog_dump:
-            LOG.always("OplogThread: Starting oplog dump (buffered 1000)")
+            LOG.always("OplogThread: Starting oplog dump (buffered 10000)")
             self.start_oplog_dump()
             LOG.always("OplogThread: Oplog dump started")
 
