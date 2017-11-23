@@ -271,7 +271,7 @@ class OplogThread(threading.Thread):
                 try:
                     buffer = pickle.load(self.oplog_dump_file_r)
                     while len(buffer) > 0:
-                        entry = buffer.pop()
+                        entry = buffer.pop(0)
                         yield entry
                 except EOFError:
                     LOG.always("EOF oplog dump")
@@ -291,7 +291,7 @@ class OplogThread(threading.Thread):
         LOG.debug("OplogThread: Run thread started")
 
         if self.do_oplog_dump:
-            LOG.always("OplogThread: Starting oplog dump (buff size cfg)")
+            LOG.always("OplogThread: Starting oplog dump (buff size cfg, ord)")
             self.start_oplog_dump()
             LOG.always("OplogThread: Oplog dump started")
 
