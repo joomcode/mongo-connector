@@ -140,6 +140,7 @@ class OplogThread(threading.Thread):
         self.min_ahead_time = kwargs.get('min_ahead_time')
         # Boolean describing wheather or not the oplog dump thread is running
         self.oplog_dump_running = False
+        self.oplog_dump_buf_size = kwargs.get('oplog_dump_buf_size')
 
         if not self.oplog.find_one():
             err_msg = 'OplogThread: No oplog for thread:'
@@ -214,7 +215,7 @@ class OplogThread(threading.Thread):
                     skip, is_gridfs_file = self._should_skip_entry(entry)
                     if not skip:
                         buffer.append(entry)
-                    if len(buffer) == constants.DEFAULT_OPLOG_DUMP_BUFFER_SIZE:
+                    if len(buffer) == self.oplog_dump_buf_size:
                         pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
                         buffer = buffer[:0]
             LOG.always("OplogDump thread finishing. Deleting oplog dump file")
@@ -290,7 +291,7 @@ class OplogThread(threading.Thread):
         LOG.debug("OplogThread: Run thread started")
 
         if self.do_oplog_dump:
-            LOG.always("OplogThread: Starting oplog dump (buffered 10000)")
+            LOG.always("OplogThread: Starting oplog dump (buff size cfg)")
             self.start_oplog_dump()
             LOG.always("OplogThread: Oplog dump started")
 

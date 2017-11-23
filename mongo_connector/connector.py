@@ -202,6 +202,7 @@ class Connector(threading.Thread):
             do_oplog_dump=config['doOplogDump'],
             oplog_dump_file_name=config['oplogDumpFileName'],
             min_ahead_time=config['minAheadTime'],
+            oplog_dump_buf_size=config['oplogDumpBufSize'],
             collection_dump=(not config['noDump']),
             batch_size=config['batchSize'],
             continue_on_error=config['continueOnError'],
@@ -538,6 +539,14 @@ def get_config_options():
         "Specify a name of a file where oplog is to be dumped. "
         "Default file name is /tmp/oplog.dump. "
         "Use it only if --do-oplog-dump is specified."
+    )
+
+    min_ahead_time = add_option(
+        config_key="oplogDumpBufSize",
+        default=constants.DEFAULT_OPLOG_DUMP_BUFFER_SIZE,
+        type=int)
+    min_ahead_time.add_cli(
+        "--oplog-dump-buf-size", type="int"
     )
 
     min_ahead_time = add_option(
