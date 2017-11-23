@@ -56,3 +56,5 @@ DEFAULT_META_COLLECTION_CAP_SIZE = 5 * 1024 * 1024
 # should be ahead of oldest mongo oplog entry to switch reading
 # from disk to reading from mongo cursor.
 DEFAULT_MIN_AHEAD_TIME = 1200
+# Size of a buffer written to oplog dump file
+DEFAULT_OPLOG_DUMP_BUFFER_SIZE = 100000

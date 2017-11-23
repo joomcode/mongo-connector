@@ -33,7 +33,7 @@ import os
 
 from pymongo import CursorType, errors as pymongo_errors
 
-from mongo_connector import errors, util
+from mongo_connector import errors, util, constants
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
 from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
@@ -207,12 +207,16 @@ class OplogThread(threading.Thread):
     def start_oplog_dump(self):
         def dumpOplogEntries(cursor):
             while cursor.alive and self.running and self.oplog_dump_running:
+                buffer = []
                 for n, entry in enumerate(cursor):
                     if not self.running:
                         break
                     skip, is_gridfs_file = self._should_skip_entry(entry)
                     if not skip:
-                        pickle.dump(entry, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
+                        buffer.append(entry)
+                    if len(buffer) == constants.DEFAULT_OPLOG_DUMP_BUFFER_SIZE:
+                        pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
+                        buffer = buffer[:0]
             LOG.always("OplogDump thread finishing. Deleting oplog dump file")
             try:
                 os.remove(self.oplog_dump_file_name)
@@ -264,17 +268,19 @@ class OplogThread(threading.Thread):
                     self.oplog_dump_running = False
                     continue
                 try:
-                    entry = pickle.load(self.oplog_dump_file_r)
+                    buffer = pickle.load(self.oplog_dump_file_r)
+                    while len(buffer) > 0:
+                        entry = buffer.pop()
+                        yield entry
                 except EOFError:
                     LOG.always("EOF oplog dump")
                     pass
             elif self.cursor.alive and self.running:
                 entry = next(self.cursor)
+                yield entry
             else:
                 LOG.always("Entry spewer stop iteration")
                 raise StopIteration
-
-            yield entry
 
     @log_fatal_exceptions
     def run(self):
@@ -284,7 +290,7 @@ class OplogThread(threading.Thread):
         LOG.debug("OplogThread: Run thread started")
 
         if self.do_oplog_dump:
-            LOG.always("OplogThread: Starting oplog dump")
+            LOG.always("OplogThread: Starting oplog dump (buffered)")
             self.start_oplog_dump()
             LOG.always("OplogThread: Oplog dump started")
 
