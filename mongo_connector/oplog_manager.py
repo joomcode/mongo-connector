@@ -293,7 +293,7 @@ class OplogThread(threading.Thread):
         LOG.debug("OplogThread: Run thread started")
 
         if self.do_oplog_dump:
-            LOG.always("OplogThread: Starting oplog dump (buff size cfg, ord, log)")
+            LOG.always("OplogThread: Starting oplog dump (buff size cfg, ord, log, test)")
             self.start_oplog_dump()
             LOG.always("OplogThread: Oplog dump started")
 
