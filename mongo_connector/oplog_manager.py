@@ -228,7 +228,7 @@ class OplogThread(threading.Thread):
         if timestamp is None:
             self.running = False
         else:
-            self.oplog_dump_file_w.truncate(0)
+            self.oplog_dump_file_w
 
             while True:
                 cursor = self.get_oplog_cursor(timestamp)
