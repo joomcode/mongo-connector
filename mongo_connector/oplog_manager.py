@@ -28,7 +28,7 @@ import threading
 import pymongo
 
 import threading
-import json
+import pickle
 import os
 
 from pymongo import CursorType, errors as pymongo_errors
@@ -131,8 +131,8 @@ class OplogThread(threading.Thread):
 
         self.do_oplog_dump = kwargs.get('do_oplog_dump')
         self.oplog_dump_file_name = kwargs.get('oplog_dump_file_name')
-        self.oplog_dump_file_w = open(self.oplog_dump_file_name, "a")
-        self.oplog_dump_file_r = open(self.oplog_dump_file_name, "r")
+        self.oplog_dump_file_w = open(self.oplog_dump_file_name, "ab")
+        self.oplog_dump_file_r = open(self.oplog_dump_file_name, "rb")
         # Timestamp of last exported oplog entry
         self.last_ts = None
         # Last exported oplog entry from disk must be this number of seconds
@@ -216,7 +216,7 @@ class OplogThread(threading.Thread):
                     if not skip:
                         buffer.append(entry)
                     if len(buffer) == self.oplog_dump_buf_size:
-                        json.dump(buffer, self.oplog_dump_file_w)
+                        pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
                         buffer = buffer[:0]
             LOG.always("OplogDump thread finishing. Deleting oplog dump file")
             try:
@@ -270,7 +270,7 @@ class OplogThread(threading.Thread):
                     continue
                 try:
                     LOG.always("Loading oplog dump buffer")
-                    buffer = json.load(self.oplog_dump_file_r)
+                    buffer = pickle.load(self.oplog_dump_file_r)
                     LOG.always("Loaded oplog dump buffer with len %s", len(buffer))
                     while len(buffer) > 0:
                         entry = buffer.pop(0)
@@ -293,7 +293,7 @@ class OplogThread(threading.Thread):
         LOG.debug("OplogThread: Run thread started")
 
         if self.do_oplog_dump:
-            LOG.always("OplogThread: Starting oplog dump (buff size cfg, ord, log, test, json)")
+            LOG.always("OplogThread: Starting oplog dump (buff size cfg, ord, log, test)")
             self.start_oplog_dump()
             LOG.always("OplogThread: Oplog dump started")
 
@@ -401,7 +401,7 @@ class OplogThread(threading.Thread):
                                     "document %r" % entry)
 
                         if (remove_inc + upsert_inc + update_inc) % 1000 == 0:
-                            LOG.always(
+                            LOG.debug(
                                 "OplogThread: Documents removed: %d, "
                                 "inserted: %d, updated: %d so far" % (
                                     remove_inc, upsert_inc, update_inc))
