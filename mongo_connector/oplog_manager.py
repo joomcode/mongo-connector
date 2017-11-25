@@ -146,86 +146,63 @@ class OplogThread(threading.Thread):
             err_msg = 'OplogThread: No oplog for thread:'
             LOG.warning('%s %s' % (err_msg, self.primary_client))
 
-    def _should_skip_entry(self, entry, load):
+    def _should_skip_entry(self, entry):
         """Determine if this oplog entry should be skipped.
 
         This has the possible side effect of modifying the entry's namespace
         and filtering fields from updates and inserts.
         """
-        if load == True:
-            LOG.always("1")
         # Don't replicate entries resulting from chunk moves
         if entry.get("fromMigrate"):
             return True, False
 
-        if load == True:
-            LOG.always("2")
         # Ignore no-ops
         if entry['op'] == 'n':
             return True, False
         ns = entry['ns']
 
-        if load == True:
-            LOG.always("3")
         if '.' not in ns:
             return True, False
         coll = ns.split('.', 1)[1]
 
-        if load == True:
-            LOG.always("4")
         # Ignore system collections
         if coll.startswith("system."):
             return True, False
 
-        if load == True:
-            LOG.always("5")
         # Ignore GridFS chunks
         if coll.endswith('.chunks'):
             return True, False
 
-        if load == True:
-            LOG.always("6")
         is_gridfs_file = False
         if coll.endswith(".files"):
             ns = ns[:-len(".files")]
             if self.namespace_config.gridfs_namespace(ns):
-                LOG.always("6.5")
                 is_gridfs_file = True
             else:
                 return True, False
 
-        if load == True:
-            LOG.always("7")
         # Commands should not be ignored, filtered, or renamed. Renaming is
         # handled by the DocManagers via the CommandHelper class.
         if coll == "$cmd":
             return False, False
 
-        if load == True:
-            LOG.always("8")
         # Rename or filter out namespaces that are ignored keeping
         # included gridfs namespaces.
         namespace = self.namespace_config.lookup(ns)
         if namespace is None:
-            if load == True:
-                LOG.always("OplogThread: Skipping oplog entry: "
-                          "'%s' is not in the namespace configuration." % (ns,))
+            # LOG.debug("OplogThread: Skipping oplog entry: "
+            #           "'%s' is not in the namespace configuration." % (ns,))
             return True, False
 
         # Update the namespace.
         entry['ns'] = namespace.dest_name
 
-        if load == True:
-            LOG.always("9")
         # Take fields out of the oplog entry that shouldn't be replicated.
         # This may nullify the document if there's nothing to do.
         if not self.filter_oplog_entry(
                 entry, include_fields=namespace.include_fields,
                 exclude_fields=namespace.exclude_fields):
-            if load == True:
-                LOG.always("10")
             return True, False
-        LOG.always("11")
         return False, is_gridfs_file
 
     def start_oplog_dump(self):
@@ -235,7 +212,7 @@ class OplogThread(threading.Thread):
                 for n, entry in enumerate(cursor):
                     if not self.running:
                         break
-                    skip, is_gridfs_file = self._should_skip_entry(entry, False)
+                    skip, is_gridfs_file = self._should_skip_entry(entry)
                     if not skip:
                         buffer.append(entry)
                     if len(buffer) == self.oplog_dump_buf_size:
@@ -251,7 +228,7 @@ class OplogThread(threading.Thread):
         if timestamp is None:
             self.running = False
         else:
-            # self.oplog_dump_file_w.truncate(0)
+            self.oplog_dump_file_w.truncate(0)
 
             while True:
                 cursor = self.get_oplog_cursor(timestamp)
@@ -315,8 +292,8 @@ class OplogThread(threading.Thread):
         ReplicationLagLogger(self, 30).start()
         LOG.debug("OplogThread: Run thread started")
 
-        if self.do_oplog_dump and False:
-            LOG.always("OplogThread: Starting oplog dump (debug)")
+        if self.do_oplog_dump:
+            LOG.always("OplogThread: Starting oplog dump (buff size cfg, ord, log, test)")
             self.start_oplog_dump()
             LOG.always("OplogThread: Oplog dump started")
 
@@ -359,9 +336,8 @@ class OplogThread(threading.Thread):
                                   " document number in this cursor is %d"
                                   % n)
 
-                        skip, is_gridfs_file = self._should_skip_entry(entry, True)
+                        skip, is_gridfs_file = self._should_skip_entry(entry)
                         if skip:
-                            LOG.always("It was skipped!!!")
                             # update the last_ts on skipped entries to ensure
                             # our checkpoint does not fall off the oplog. This
                             # also prevents reprocessing skipped entries.
@@ -374,7 +350,7 @@ class OplogThread(threading.Thread):
                         timestamp = util.bson_ts_to_long(entry['ts'])
                         for docman in self.doc_managers:
                             try:
-                                LOG.always("OplogThread: Operation for this "
+                                LOG.debug("OplogThread: Operation for this "
                                           "entry is %s" % str(operation))
 
                                 # Remove
@@ -416,7 +392,6 @@ class OplogThread(threading.Thread):
                                                           timestamp)
 
                             except errors.OperationFailed:
-                                LOG.always("Unable to process oplog document %r" % entry)
                                 LOG.exception(
                                     "Unable to process oplog document %r"
                                     % entry)
@@ -426,12 +401,12 @@ class OplogThread(threading.Thread):
                                     "document %r" % entry)
 
                         if (remove_inc + upsert_inc + update_inc) % 1000 == 0:
-                            LOG.always(
+                            LOG.debug(
                                 "OplogThread: Documents removed: %d, "
                                 "inserted: %d, updated: %d so far" % (
                                     remove_inc, upsert_inc, update_inc))
 
-                        LOG.always("OplogThread: Doc is processed.")
+                        LOG.debug("OplogThread: Doc is processed.")
 
                         self.last_ts = entry['ts']
 
@@ -443,7 +418,7 @@ class OplogThread(threading.Thread):
 
                     # update timestamp after running through oplog
                     if self.last_ts is not None:
-                        LOG.always("OplogThread: updating checkpoint after "
+                        LOG.debug("OplogThread: updating checkpoint after "
                                   "processing new oplog entries")
                         self.update_checkpoint(self.last_ts)
 
@@ -865,7 +840,6 @@ class OplogThread(threading.Thread):
 
         Returns the cursor and True if the cursor is empty.
         """
-        return None, True
         timestamp = self.read_last_checkpoint()
 
         if timestamp is None:
