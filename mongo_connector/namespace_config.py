@@ -188,18 +188,22 @@ class NamespaceConfig(object):
         """Given a plain source namespace, return the corresponding Namespace
         object, or None if it is not included.
         """
+        LOG.always("lookup 1: %s" % plain_src_ns)
         # Ignore the namespace if it is excluded.
         if plain_src_ns in self._ex_namespace_set:
             return None
+        LOG.always("lookup 2")
         # Include all namespaces if there are no included namespaces.
         if not self._regex_map and not self._plain:
             return Namespace(dest_name=plain_src_ns, source_name=plain_src_ns,
                              include_fields=self._include_fields,
                              exclude_fields=self._exclude_fields)
+        LOG.always("lookup 3")
         # First, search for the namespace in the plain namespaces.
         try:
             return self._plain[plain_src_ns]
         except KeyError:
+            LOG.always("lookup 4")
             # Search for the namespace in the wildcard namespaces.
             for regex, namespace in self._regex_map:
                 new_name = match_replace_regex(regex, plain_src_ns,
@@ -213,6 +217,7 @@ class NamespaceConfig(object):
                 self._add_plain_namespace(new_namespace)
                 return new_namespace
 
+        LOG.always("lookup 5")
         # Save the not included namespace to the excluded namespaces so
         # that future lookups of the same namespace are fast.
         self._ex_namespace_set.add(plain_src_ns)
