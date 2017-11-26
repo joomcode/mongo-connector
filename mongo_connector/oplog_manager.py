@@ -146,7 +146,7 @@ class OplogThread(threading.Thread):
             err_msg = 'OplogThread: No oplog for thread:'
             LOG.warning('%s %s' % (err_msg, self.primary_client))
 
-    def _should_skip_entry(self, entry):
+    def _should_skip_entry(self, entry, forDump):
         """Determine if this oplog entry should be skipped.
 
         This has the possible side effect of modifying the entry's namespace
@@ -194,6 +194,9 @@ class OplogThread(threading.Thread):
             #           "'%s' is not in the namespace configuration." % (ns,))
             return True, False
 
+        if forDump:
+            return False, is_gridfs_file
+
         # Update the namespace.
         entry['ns'] = namespace.dest_name
 
@@ -212,10 +215,8 @@ class OplogThread(threading.Thread):
                 for n, entry in enumerate(cursor):
                     if not self.running:
                         break
-                    origNS = entry['ns']
-                    skip, is_gridfs_file = self._should_skip_entry(entry)
+                    skip, is_gridfs_file = self._should_skip_entry(entry, True)
                     if not skip:
-                        entry['ns'] = origNS
                         buffer.append(entry)
                     if len(buffer) == self.oplog_dump_buf_size:
                         pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
@@ -338,7 +339,7 @@ class OplogThread(threading.Thread):
                                   " document number in this cursor is %d"
                                   % n)
 
-                        skip, is_gridfs_file = self._should_skip_entry(entry)
+                        skip, is_gridfs_file = self._should_skip_entry(entry, False)
                         if skip:
                             # update the last_ts on skipped entries to ensure
                             # our checkpoint does not fall off the oplog. This
