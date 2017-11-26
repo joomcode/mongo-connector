@@ -221,11 +221,9 @@ class OplogThread(threading.Thread):
                     if len(buffer) == self.oplog_dump_buf_size:
                         pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
                         buffer = buffer[:0]
-            LOG.always("OplogDump thread finishing. Deleting oplog dump file")
-            try:
-                os.remove(self.oplog_dump_file_name)
-            except OSError:
-                pass
+            LOG.always("OplogDump thread finishing (cursor alive: %s, "
+                       "main thread running: %s, oplog dump thread running)"
+                       % (cursor.alive, self.running, self.oplog_dump_running))
 
         timestamp = retry_until_ok(self.get_last_oplog_timestamp)
         if timestamp is None:
@@ -275,8 +273,10 @@ class OplogThread(threading.Thread):
                     # LOG.always("Loading oplog dump buffer")
                     buffer = pickle.load(self.oplog_dump_file_r)
                     # LOG.always("Loaded oplog dump buffer with len %s", len(buffer))
-                    while len(buffer) > 0:
-                        entry = buffer.pop(0)
+                    i = 0
+                    while i < len(buffer):
+                        entry = buffer[i]
+                        i += 1
                         yield entry
                 except EOFError:
                     LOG.always("EOF oplog dump")
