@@ -293,7 +293,7 @@ class OplogThread(threading.Thread):
         """Start the oplog worker.
         """
         ReplicationLagLogger(self, 30).start()
-        LOG.debug("OplogThread: Run thread started")
+        LOG.debug("OplogThread: Run thread started (5)")
 
         if self.do_oplog_dump:
             LOG.always("OplogThread: Starting oplog dump (ns solved 2)")
