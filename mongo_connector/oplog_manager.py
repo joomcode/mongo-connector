@@ -213,7 +213,7 @@ class OplogThread(threading.Thread):
             while cursor.alive and self.running and self.oplog_dump_running:
                 buffer = []
                 for n, entry in enumerate(cursor):
-                    if not self.running or not self.oplog_dump_running:
+                    if not self.running:
                         break
                     skip, is_gridfs_file = self._should_skip_entry(entry, True)
                     if not skip:
@@ -262,8 +262,6 @@ class OplogThread(threading.Thread):
 
         if self.cursor is None:
             LOG.always("Oplog is too much ahead. Start reading from oplog dump")
-        else:
-            self.oplog_dump_running = False
 
         while True:
             if self.cursor is None:
@@ -295,7 +293,7 @@ class OplogThread(threading.Thread):
         """Start the oplog worker.
         """
         ReplicationLagLogger(self, 30).start()
-        LOG.always("OplogThread: Run thread started (4)")
+        LOG.debug("OplogThread: Run thread started")
 
         if self.do_oplog_dump:
             LOG.always("OplogThread: Starting oplog dump (ns solved 2)")
@@ -430,7 +428,7 @@ class OplogThread(threading.Thread):
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure,
                     pymongo.errors.ConfigurationError):
-                LOG.always(
+                LOG.exception(
                     "Cursor closed due to an exception. "
                     "Will attempt to reconnect.")
 
@@ -848,7 +846,6 @@ class OplogThread(threading.Thread):
         timestamp = self.read_last_checkpoint()
 
         if timestamp is None:
-            LOG.always("No timestamp found in init")
             if self.collection_dump:
                 # dump collection and update checkpoint
                 timestamp = self.dump_collection()
@@ -862,15 +859,13 @@ class OplogThread(threading.Thread):
                 # has been applied.
                 cursor = self.get_oplog_cursor()
                 return cursor, self._cursor_empty(cursor)
-        else:
-            LOG.always("Timestamp found in init")
 
         cursor = self.get_oplog_cursor(timestamp)
         cursor_empty = self._cursor_empty(cursor)
 
         if cursor_empty:
             # rollback, update checkpoint, and retry
-            LOG.always("OplogThread: Initiating rollback from "
+            LOG.debug("OplogThread: Initiating rollback from "
                       "get_oplog_cursor")
             self.update_checkpoint(self.rollback())
             return self.init_cursor()
@@ -881,7 +876,7 @@ class OplogThread(threading.Thread):
             self.get_oldest_oplog_timestamp())
         checkpoint_ts_long = util.bson_ts_to_long(timestamp)
         if checkpoint_ts_long < oldest_ts_long:
-            LOG.always("We've fallen behind, the checkpoint has fallen off the oplog")
+            # We've fallen behind, the checkpoint has fallen off the oplog
             return None, True
 
         cursor_ts_long = util.bson_ts_to_long(first_oplog_entry["ts"])
@@ -891,7 +886,7 @@ class OplogThread(threading.Thread):
             # primary which did not replicate the checkpoint and which has
             # new changes in its oplog for us to process.
             # rollback, update checkpoint, and retry
-            LOG.always("OplogThread: Initiating rollback from "
+            LOG.debug("OplogThread: Initiating rollback from "
                       "get_oplog_cursor: new oplog entries found but "
                       "checkpoint is not present")
             self.update_checkpoint(self.rollback())
