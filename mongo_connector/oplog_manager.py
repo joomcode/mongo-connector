@@ -213,7 +213,7 @@ class OplogThread(threading.Thread):
             while cursor.alive and self.running and self.oplog_dump_running:
                 buffer = []
                 for n, entry in enumerate(cursor):
-                    if not self.running:
+                    if not self.running or not self.oplog_dump_running:
                         break
                     skip, is_gridfs_file = self._should_skip_entry(entry, True)
                     if not skip:
@@ -262,8 +262,10 @@ class OplogThread(threading.Thread):
 
         if self.cursor is None:
             LOG.always("Oplog is too much ahead. Start reading from oplog dump")
+        else:
+            self.oplog_dump_running = False
 
-        while True:
+        while self.running:
             if self.cursor is None:
                 if ahead_enough():
                     LOG.always("Ahead enough of mongo oldest oplog entry")
@@ -280,6 +282,7 @@ class OplogThread(threading.Thread):
                         yield entry
                 except EOFError:
                     LOG.always("EOF oplog dump")
+                    self.running = False
                     pass
             elif self.cursor.alive and self.running:
                 entry = next(self.cursor)
@@ -293,7 +296,7 @@ class OplogThread(threading.Thread):
         """Start the oplog worker.
         """
         ReplicationLagLogger(self, 30).start()
-        LOG.debug("OplogThread: Run thread started (5)")
+        LOG.always("OplogThread: Run thread started (6)")
 
         if self.do_oplog_dump:
             LOG.always("OplogThread: Starting oplog dump (ns solved 2)")
