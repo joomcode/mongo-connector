@@ -209,10 +209,22 @@ class OplogThread(threading.Thread):
         return False, is_gridfs_file
 
     def start_oplog_dump(self):
-        def dumpOplogEntries(cursor):
+        def init_dump_cursor(ts):
+            while True:
+                cursor = self.get_oplog_cursor(ts)
+                cursor_empty = self._cursor_empty(cursor)
+                if cursor_empty:
+                    time.sleep(1)
+                else:
+                    break
+            return cursor
+
+        def dump_oplog_entries(cursor):
+            last_ts = None
             while cursor.alive and self.running and self.oplog_dump_running:
                 buffer = []
                 for n, entry in enumerate(cursor):
+                    last_ts = entry['ts']
                     if not self.running or not self.oplog_dump_running:
                         break
                     skip, is_gridfs_file = self._should_skip_entry(entry, True)
@@ -221,6 +233,11 @@ class OplogThread(threading.Thread):
                     if len(buffer) == self.oplog_dump_buf_size:
                         pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
                         buffer = buffer[:0]
+                if len(buffer) > 0:
+                    pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
+                if not cursor.alive and last_ts is not None and self.running and self.oplog_dump_running:
+                    cursor = init_dump_cursor(last_ts)
+
             LOG.always("OplogDump thread finishing. Deleting oplog dump file")
             try:
                 os.remove(self.oplog_dump_file_name)
@@ -233,16 +250,10 @@ class OplogThread(threading.Thread):
         else:
             self.oplog_dump_file_w.truncate(0)
 
-            while True:
-                cursor = self.get_oplog_cursor(timestamp)
-                cursor_empty = self._cursor_empty(cursor)
-                if cursor_empty:
-                    time.sleep(1)
-                else:
-                    break
+            dump_cursor = init_dump_cursor(timestamp)
 
             self.oplog_dump_running = True
-            t = threading.Thread(target=dumpOplogEntries, args=(cursor,))
+            t = threading.Thread(target=dump_oplog_entries, args=(dump_cursor,))
             t.start()
 
     def entry_spewer(self):
