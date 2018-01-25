@@ -873,6 +873,8 @@ class OplogThread(threading.Thread):
                 # has been applied.
                 cursor = self.get_oplog_cursor()
                 return cursor, self._cursor_empty(cursor)
+        else:
+            LOG.always("Oplog is caught with timestamp %s" % timestamp)
 
         cursor = self.get_oplog_cursor(timestamp)
         cursor_empty = self._cursor_empty(cursor)
