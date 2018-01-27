@@ -212,9 +212,8 @@ class OplogThread(threading.Thread):
         def init_dump_cursor(ts):
             while True:
                 cursor = self.get_oplog_cursor(ts)
-                cursor_empty = self._cursor_empty(cursor)
-                if cursor_empty:
-                    time.sleep(1)
+                if not cursor.alive:
+                    time.sleep(2)
                 else:
                     break
             return cursor
@@ -223,6 +222,7 @@ class OplogThread(threading.Thread):
             last_ts = None
             while cursor.alive and self.running and self.oplog_dump_running:
                 buffer = []
+                LOG.always("Dump cursor is alive (%s) with id (%s). Proceeding..." % (cursor.alive, cursor.cursor_id))
                 for n, entry in enumerate(cursor):
                     last_ts = entry['ts']
                     if not self.running or not self.oplog_dump_running:
@@ -233,15 +233,21 @@ class OplogThread(threading.Thread):
                     if len(buffer) == self.oplog_dump_buf_size:
                         pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
                         buffer = buffer[:0]
+                LOG.always("Lost dump cursor. Initializing it again...")
+                LOG.always("Last ts: %s", last_ts)
                 if len(buffer) > 0:
                     pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
+                    LOG.always("Dumped oplog dump buf after losing cursor")
                 if not cursor.alive and last_ts is not None and self.running and self.oplog_dump_running:
+                    time.sleep(2)
                     cursor = init_dump_cursor(last_ts)
+                    LOG.always("Lost dump cursor initialized")
 
             LOG.always("OplogDump thread finishing. Deleting oplog dump file")
             try:
                 os.remove(self.oplog_dump_file_name)
             except OSError:
+                LOG.always("Error when removing oplog dump file")
                 pass
 
         timestamp = retry_until_ok(self.get_last_oplog_timestamp)
@@ -250,6 +256,7 @@ class OplogThread(threading.Thread):
         else:
             self.oplog_dump_file_w.truncate(0)
 
+            LOG.always("Oldest ts for dump: %s" % timestamp)
             dump_cursor = init_dump_cursor(timestamp)
 
             self.oplog_dump_running = True
@@ -274,6 +281,7 @@ class OplogThread(threading.Thread):
         if self.cursor is None:
             LOG.always("Oplog is too much ahead. Start reading from oplog dump")
         else:
+            LOG.always("Oplog is caught right after initial sync. Stopping oplog dump...")
             self.oplog_dump_running = False
 
         while self.running:
@@ -342,7 +350,7 @@ class OplogThread(threading.Thread):
                 LOG.always("OplogThread: about to process new oplog entries")
                 while (self.cursor is None or self.cursor.alive) and \
                         self.running:
-                    LOG.debug("OplogThread: Cursor is still"
+                    LOG.always("OplogThread: Cursor is still"
                               " alive and thread is still running.")
                     for n, entry in enumerate(self.entry_spewer()):
                         # Break out if this thread should stop
@@ -442,7 +450,7 @@ class OplogThread(threading.Thread):
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure,
                     pymongo.errors.ConfigurationError):
-                LOG.exception(
+                LOG.always(
                     "Cursor closed due to an exception. "
                     "Will attempt to reconnect.")
 
