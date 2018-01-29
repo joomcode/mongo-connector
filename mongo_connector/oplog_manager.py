@@ -209,22 +209,12 @@ class OplogThread(threading.Thread):
         return False, is_gridfs_file
 
     def start_oplog_dump(self):
-        def init_dump_cursor(ts):
-            while True:
-                cursor = self.get_oplog_cursor(ts)
-                if not cursor.alive:
-                    time.sleep(2)
-                else:
-                    break
-            return cursor
-
         def dump_oplog_entries(cursor):
-            last_ts = None
+            buffer = []
             while cursor.alive and self.running and self.oplog_dump_running:
-                buffer = []
                 LOG.always("Dump cursor is alive (%s) with id (%s). Proceeding..." % (cursor.alive, cursor.cursor_id))
                 for n, entry in enumerate(cursor):
-                    last_ts = entry['ts']
+                    last_doc_ts = entry['ts']
                     if not self.running or not self.oplog_dump_running:
                         break
                     skip, is_gridfs_file = self._should_skip_entry(entry, True)
@@ -234,14 +224,11 @@ class OplogThread(threading.Thread):
                         pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
                         buffer = buffer[:0]
                 LOG.always("Lost dump cursor. Initializing it again...")
-                LOG.always("Last ts: %s", last_ts)
-                if len(buffer) > 0:
-                    pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
-                    LOG.always("Dumped oplog dump buf after losing cursor")
-                if not cursor.alive and last_ts is not None and self.running and self.oplog_dump_running:
-                    time.sleep(2)
-                    cursor = init_dump_cursor(last_ts)
-                    LOG.always("Lost dump cursor initialized")
+                LOG.always("Last ts: %s", last_doc_ts)
+                while not cursor.alive:
+                    time.sleep(1)
+                    cursor = self.get_oplog_cursor(last_doc_ts)
+                LOG.always("Lost dump cursor initialized")
 
             LOG.always("OplogDump thread finishing. Deleting oplog dump file")
             try:
@@ -257,7 +244,7 @@ class OplogThread(threading.Thread):
             self.oplog_dump_file_w.truncate(0)
 
             LOG.always("Oldest ts for dump: %s" % timestamp)
-            dump_cursor = init_dump_cursor(timestamp)
+            dump_cursor = self.get_oplog_cursor(timestamp)
 
             self.oplog_dump_running = True
             t = threading.Thread(target=dump_oplog_entries, args=(dump_cursor,))
