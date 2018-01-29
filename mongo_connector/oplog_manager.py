@@ -220,8 +220,11 @@ class OplogThread(threading.Thread):
                     skip, is_gridfs_file = self._should_skip_entry(entry, True)
                     if not skip:
                         buffer.append(entry)
+                        if len(buffer) % 100 == 0:
+                            LOG.always("Cur buf len: %d" % len(buffer))
                     if len(buffer) == self.oplog_dump_buf_size:
                         pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
+                        LOG.always("Dumped to file")
                         buffer = buffer[:0]
                 LOG.always("Lost dump cursor. Initializing it again...")
                 LOG.always("Last ts: %s", last_doc_ts)
@@ -654,7 +657,7 @@ class OplogThread(threading.Thread):
 
         dump_set, gridfs_dump_set = get_all_ns()
 
-        LOG.debug("OplogThread: Dumping set of collections %s " % dump_set)
+        LOG.always("OplogThread: Dumping set of collections %s " % dump_set)
 
         def docs_to_dump(from_coll):
             last_id = None
@@ -725,14 +728,14 @@ class OplogThread(threading.Thread):
                     total_docs = retry_until_ok(from_coll.count)
                     mapped_ns = self.namespace_config.map_namespace(
                             namespace)
-                    LOG.info("Bulk upserting approximately %d docs from "
+                    LOG.always("Bulk upserting approximately %d docs from "
                              "collection '%s'",
                              total_docs, namespace)
                     dm.bulk_upsert(docs_to_dump(from_coll),
                                    mapped_ns, long_ts)
             except Exception:
                 if self.continue_on_error:
-                    LOG.exception("OplogThread: caught exception"
+                    LOG.always("OplogThread: caught exception"
                                   " during bulk upsert, re-upserting"
                                   " documents serially")
                     upsert_each(dm)
@@ -741,7 +744,7 @@ class OplogThread(threading.Thread):
 
         def do_dump(dm, error_queue):
             try:
-                LOG.debug("OplogThread: Using bulk upsert function for "
+                LOG.always("OplogThread: Using bulk upsert function for "
                           "collection dump")
                 upsert_all(dm)
 
@@ -787,7 +790,7 @@ class OplogThread(threading.Thread):
         # Print caught exceptions
         try:
             while True:
-                LOG.critical('Exception during collection dump',
+                LOG.always('Exception during collection dump',
                              exc_info=errors.get_nowait())
                 dump_success = False
         except queue.Empty:
@@ -796,7 +799,7 @@ class OplogThread(threading.Thread):
         if not dump_success:
             err_msg = "OplogThread: Failed during dump collection"
             effect = "cannot recover!"
-            LOG.error('%s %s %s' % (err_msg, effect, self.oplog))
+            LOG.always('%s %s %s' % (err_msg, effect, self.oplog))
             self.running = False
             return None
 
