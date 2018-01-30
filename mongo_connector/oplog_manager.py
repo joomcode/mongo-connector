@@ -211,9 +211,14 @@ class OplogThread(threading.Thread):
     def start_oplog_dump(self):
         def dump_oplog_entries(cursor):
             buffer = []
+            all_ = 0
+            skipped = 0
             while cursor.alive and self.running and self.oplog_dump_running:
                 LOG.always("Dump cursor is alive (%s) with id (%s). Proceeding..." % (cursor.alive, cursor.cursor_id))
                 for n, entry in enumerate(cursor):
+                    if all_ % 100 == 0:
+                        LOG.always("All: %d" % all_)
+                    all_ = all_ + 1
                     last_doc_ts = entry['ts']
                     if not self.running or not self.oplog_dump_running:
                         break
@@ -222,6 +227,10 @@ class OplogThread(threading.Thread):
                         buffer.append(entry)
                         if len(buffer) % 100 == 0:
                             LOG.always("Cur buf len: %d" % len(buffer))
+                    else:
+                        if skipped % 100 == 0:
+                            LOG.always("Skipped: %d" % skipped)
+                        skipped = skipped + 1
                     if len(buffer) == self.oplog_dump_buf_size:
                         pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
                         LOG.always("Dumped to file")
