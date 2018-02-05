@@ -211,36 +211,24 @@ class OplogThread(threading.Thread):
     def start_oplog_dump(self):
         def dump_oplog_entries(cursor):
             buffer = []
-            all_ = 0
-            skipped = 0
             while cursor.alive and self.running and self.oplog_dump_running:
                 LOG.always("Dump cursor is alive (%s) with id (%s). Proceeding..." % (cursor.alive, cursor.cursor_id))
                 try:
                     for n, entry in enumerate(cursor):
-                        if all_ % 100 == 0:
-                            LOG.always("All: %d" % all_)
-                        all_ = all_ + 1
                         last_doc_ts = entry['ts']
                         if not self.running or not self.oplog_dump_running:
                             break
                         skip, is_gridfs_file = self._should_skip_entry(entry, True)
                         if not skip:
                             buffer.append(entry)
-                            if len(buffer) % 100 == 0:
-                                LOG.always("Cur buf len: %d" % len(buffer))
-                        else:
-                            if skipped % 100 == 0:
-                                LOG.always("Skipped: %d" % skipped)
-                            skipped = skipped + 1
                         if len(buffer) == self.oplog_dump_buf_size:
                             pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
-                            LOG.always("Dumped to file")
                             buffer = buffer[:0]
                 except (pymongo.errors.AutoReconnect,
                         pymongo.errors.OperationFailure,
                         pymongo.errors.ConfigurationError):
                             LOG.always(
-                                "Cursor closed due to an exception. "
+                                "Oplog dump cursor closed due to an exception. "
                                 "Will attempt to reconnect.")
 
                 LOG.always("Lost dump cursor. Initializing it again...")
