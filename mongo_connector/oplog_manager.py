@@ -212,7 +212,6 @@ class OplogThread(threading.Thread):
         def dump_oplog_entries(cursor):
             buffer = []
             while cursor.alive and self.running and self.oplog_dump_running:
-                LOG.always("Dump cursor is alive (%s) with id (%s). Proceeding..." % (cursor.alive, cursor.cursor_id))
                 try:
                     for n, entry in enumerate(cursor):
                         last_doc_ts = entry['ts']
@@ -231,12 +230,9 @@ class OplogThread(threading.Thread):
                                 "Oplog dump cursor closed due to an exception. "
                                 "Will attempt to reconnect.")
 
-                LOG.always("Lost dump cursor. Initializing it again...")
-                LOG.always("Last ts: %s", last_doc_ts)
                 while not cursor.alive:
                     time.sleep(1)
                     cursor = self.get_oplog_cursor(last_doc_ts)
-                LOG.always("Lost dump cursor initialized")
 
             LOG.always("OplogDump thread finishing. Deleting oplog dump file")
             try:
