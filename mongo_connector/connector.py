@@ -358,10 +358,12 @@ class Connector(threading.Thread):
                 version = module.__version__
             elif hasattr(module, 'version'):
                 version = module.version
-            LOG.always('Target DocManager: %s version: %s', name, version)
+            LOG.always('Target DocManager (2): %s version: %s', name, version)
 
+        LOG.always('123')
         self.read_oplog_progress()
         conn_type = None
+        LOG.always('456')
 
         try:
             self.main_conn.admin.command("isdbgrid")
@@ -369,6 +371,7 @@ class Connector(threading.Thread):
             conn_type = "REPLSET"
 
         if conn_type == "REPLSET":
+            LOG.always("REPLSET")
             # Make sure we are connected to a replica set
             is_master = self.main_conn.admin.command("isMaster")
             if "setName" not in is_master:
@@ -414,11 +417,12 @@ class Connector(threading.Thread):
                 # so use the config.shards collection instead.
                 for shard_doc in retry_until_ok(
                         lambda: list(self.main_conn.config.shards.find())):
+                    LOG.always("SHARD2")
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
                         shard_thread = self.shard_set[shard_id]
                         if not (shard_thread.running and shard_thread.is_alive()):
-                            LOG.error("MongoConnector: OplogThread "
+                            LOG.always("MongoConnector: OplogThread "
                                       "%s unexpectedly stopped! Shutting "
                                       "down" %
                                       (str(self.shard_set[shard_id])))
@@ -434,7 +438,7 @@ class Connector(threading.Thread):
                         repl_set, hosts = shard_doc['host'].split('/')
                     except ValueError:
                         cause = "The system only uses replica sets!"
-                        LOG.exception("MongoConnector: %s", cause)
+                        LOG.always("MongoConnector: %s", cause)
                         self.oplog_thread_join()
                         for dm in self.doc_managers:
                             dm.stop()
@@ -450,7 +454,7 @@ class Connector(threading.Thread):
                         **self.kwargs)
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
-                    LOG.info("MongoConnector: %s %s" % (msg, shard_conn))
+                    LOG.always("MongoConnector: %s %s" % (msg, shard_conn))
                     oplog.start()
 
         if self.signal is not None:

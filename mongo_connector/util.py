@@ -85,14 +85,16 @@ def retry_until_ok(func, *args, **kwargs):
                     exc.details and  # MongoDB 2.4 does not.
                     'unauthorized' == exc.details.get('errmsg')):
                 # Do not mask authorization failures.
+                LOG.always('unauthorized')
                 raise
             if i == max_tries - 1:
-                LOG.exception('Call to %s failed too many times in '
+                LOG.always('Call to %s failed too many times in '
                               'retry_until_ok', func)
                 raise
-        except Exception:
+        except Exception as exc:
+            LOG.always(exc.details.get('errmsg'))
             if i == max_tries - 1:
-                LOG.exception('Call to %s failed too many times in '
+                LOG.always('Call to %s failed too many times in '
                               'retry_until_ok', func)
                 raise
         time.sleep(1)
