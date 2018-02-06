@@ -360,10 +360,8 @@ class Connector(threading.Thread):
                 version = module.version
             LOG.always('Target DocManager (2): %s version: %s', name, version)
 
-        LOG.always('123')
         self.read_oplog_progress()
         conn_type = None
-        LOG.always('456')
 
         try:
             self.main_conn.admin.command("isdbgrid")
@@ -415,9 +413,7 @@ class Connector(threading.Thread):
             while self.can_run:
                 # The backup role does not provide the listShards privilege,
                 # so use the config.shards collection instead.
-                for shard_doc in retry_until_ok(
-                        lambda: list(self.main_conn.config.shards.find())):
-                    LOG.always("SHARD2")
+                for shard_doc in list(self.main_conn.config.shards.find()):
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
                         shard_thread = self.shard_set[shard_id]
