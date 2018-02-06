@@ -323,12 +323,12 @@ class Connector(threading.Thread):
             uri += '/?' + options
         return uri
 
-    def create_authed_client(self, hosts=None, **kwargs):
+    def create_authed_client(self, hosts=None, aux_uri_options=None, **kwargs):
         kwargs.update(self.ssl_kwargs)
         if hosts is None:
             new_uri = self.address
         else:
-            new_uri = self.copy_uri_options(hosts, self.address)
+            new_uri = self.copy_uri_options(hosts, self.address + (aux_uri_options if aux_uri_options else ""))
         client = MongoClient(new_uri, tz_aware=self.tz_aware, **kwargs)
         if self.auth_key is not None:
             client['admin'].authenticate(self.auth_username, self.auth_key)
@@ -441,7 +441,8 @@ class Connector(threading.Thread):
                         return
 
                     shard_conn = self.create_authed_client(
-                        hosts, replicaSet=repl_set)
+                        hosts, replicaSet=repl_set,
+                        aux_uri_options="&readPreference=secondary&readPreferenceTags=role:hidden")
                     self.update_version_from_client(shard_conn)
                     oplog = OplogThread(
                         shard_conn, self.doc_managers, self.oplog_progress,
