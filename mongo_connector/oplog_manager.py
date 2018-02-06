@@ -87,7 +87,7 @@ class OplogThread(threading.Thread):
     """
     def __init__(self, primary_client, doc_managers,
                  oplog_progress_dict, namespace_config,
-                 mongos_client=None, **kwargs):
+                 mongos_client=None, shard_id=None, **kwargs):
         super(OplogThread, self).__init__()
 
         self.batch_size = kwargs.get('batch_size', DEFAULT_BATCH_SIZE)
@@ -131,6 +131,8 @@ class OplogThread(threading.Thread):
 
         self.do_oplog_dump = kwargs.get('do_oplog_dump')
         self.oplog_dump_file_name = kwargs.get('oplog_dump_file_name')
+        if shard_id is not None:
+            self.oplog_dump_file_name += "." + str(shard_id)
         self.oplog_dump_file_w = open(self.oplog_dump_file_name, "ab")
         self.oplog_dump_file_r = open(self.oplog_dump_file_name, "rb")
         # Timestamp of last exported oplog entry

@@ -439,6 +439,7 @@ class Connector(threading.Thread):
                     oplog = OplogThread(
                         shard_conn, self.doc_managers, self.oplog_progress,
                         self.namespace_config, mongos_client=self.main_conn,
+                        shard_id=shard_id,
                         **self.kwargs)
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
