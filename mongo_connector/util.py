@@ -91,8 +91,7 @@ def retry_until_ok(func, *args, **kwargs):
                 LOG.always('Call to %s failed too many times in '
                               'retry_until_ok', func)
                 raise
-        except Exception as exc:
-            LOG.always(exc.details.get('errmsg'))
+        except Exception:
             if i == max_tries - 1:
                 LOG.always('Call to %s failed too many times in '
                               'retry_until_ok', func)
