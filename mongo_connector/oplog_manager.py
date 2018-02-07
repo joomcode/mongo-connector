@@ -562,6 +562,9 @@ class OplogThread(threading.Thread):
 
         fields = include_fields or exclude_fields
         entry_o = entry['o']
+
+        self.aggregate_doc(entry_o)
+
         # 'i' indicates an insert. 'o' field is the doc to be inserted.
         if entry['op'] == 'i':
             entry['o'] = filter_fields(entry_o, fields)
@@ -587,6 +590,34 @@ class OplogThread(threading.Thread):
             entry['o'] = filter_fields(entry_o, fields)
 
         return entry
+
+    def aggregate_doc(self, doc, rules=None):
+        """ Replace arrays with some aggregate based on rules """
+
+        # TODO: MOVE TO CONFIG
+        rules = {"state.statusHistory": "first"}
+
+        if rules is None:
+            return doc
+
+        for key in rules:
+            obj = doc
+            for s in key.split("."):
+                if s in obj:
+                    obj = obj[s]
+                else:
+                    break
+            if not type(obj) == list:
+                break
+            action = rules[key]
+            if action == "first":
+                while len(obj) > 1:
+                    obj.pop(len(obj) - 1)
+            if action == "last":
+                while len(obj) > 1:
+                    obj.pop(0)
+
+        return doc
 
     def get_oplog_cursor(self, timestamp=None):
         """Get a cursor to the oplog after the given timestamp, excluding
@@ -689,7 +720,7 @@ class OplogThread(threading.Thread):
                             dump_cancelled[0] = True
                             raise StopIteration
                         last_id = doc["_id"]
-                        yield doc
+                        yield self.aggregate_doc(doc)
                     break
                 except (pymongo.errors.AutoReconnect,
                         pymongo.errors.OperationFailure):
