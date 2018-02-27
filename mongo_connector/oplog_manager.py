@@ -594,6 +594,15 @@ class OplogThread(threading.Thread):
     def aggregate_doc(self, doc, rules=None):
         """ Replace arrays with some aggregate based on rules """
 
+        # Collection specific
+        # TODO: MOVE TO CONFIG
+        if "ratingsSum" in doc and "ratingsCount" in doc:
+            ratingsCount = doc["ratingsCount"]
+            ratingsSum = doc["ratingsSum"]
+            ratingsAvg = float(ratingsSum) / ratingsCount if ratingsCount > 0 else 0.0
+            doc["ratingsAvg"] = ratingsAvg
+            doc.pop("ratingsSum", None)
+
         # TODO: MOVE TO CONFIG
         rules = {"state.statusHistory": "first"}
 
