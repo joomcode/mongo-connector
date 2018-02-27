@@ -364,6 +364,13 @@ class OplogThread(threading.Thread):
 
                         # Sync the current oplog operation
                         operation = entry['op']
+
+                        if self.cursor is None:
+                            # from dump
+                            LOG.always("Op from dump: %s" % operation)
+                            if operation == 'i':
+                                LOG.always("Entry from dump: %s" % entry)
+
                         ns = entry['ns']
                         timestamp = util.bson_ts_to_long(entry['ts'])
                         for docman in self.doc_managers:
