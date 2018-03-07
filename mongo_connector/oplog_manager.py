@@ -601,6 +601,9 @@ class OplogThread(threading.Thread):
     def aggregate_doc(self, doc, rules=None):
         """ Replace arrays with some aggregate based on rules """
 
+        LOG.always("aggregate_doc:")
+        LOG.always(doc)
+
         # Collection specific
         # TODO: MOVE TO CONFIG
         if "ratingsSum" in doc and "ratingsCount" in doc:
