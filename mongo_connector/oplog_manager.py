@@ -619,7 +619,7 @@ class OplogThread(threading.Thread):
         for key in rules:
             obj = doc
             for s in key.split("."):
-                if s in obj:
+                if hasattr(obj, "__iter__") and s in obj:
                     obj = obj[s]
                 else:
                     break
