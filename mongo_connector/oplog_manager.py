@@ -570,6 +570,9 @@ class OplogThread(threading.Thread):
         fields = include_fields or exclude_fields
         entry_o = entry['o']
 
+        if '$v' in entry_o:
+            entry_o.pop('$v')
+
         self.aggregate_doc(entry_o)
 
         # 'i' indicates an insert. 'o' field is the doc to be inserted.
