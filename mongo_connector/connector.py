@@ -200,6 +200,7 @@ class Connector(threading.Thread):
             doc_managers=config['docManagers'],
             oplog_checkpoint=os.path.abspath(config['oplogFile']),
             do_oplog_dump=config['doOplogDump'],
+            do_id_copy=config['doIdCopy'],
             oplog_dump_file_name=config['oplogDumpFileName'],
             min_ahead_time=config['minAheadTime'],
             oplog_dump_buf_size=config['oplogDumpBufSize'],
@@ -537,6 +538,16 @@ def get_config_options():
         "If specified, this flag will ensure that "
         "mongo_connector will buffer oplog to disk until exporting "
         "process is ahead enough of last mongo oplog entry."
+    )
+
+    do_id_copy = add_option(
+        config_key="doIdCopy",
+        default=False,
+        type=bool)
+    do_id_copy.add_cli(
+        "--do-id-copy", action="store_true", help=
+        "If specified, this flag will ensure that "
+        "copy of id field is created."
     )
 
     oplog_dump_file_name = add_option(

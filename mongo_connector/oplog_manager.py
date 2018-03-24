@@ -144,6 +144,8 @@ class OplogThread(threading.Thread):
         self.oplog_dump_running = False
         self.oplog_dump_buf_size = kwargs.get('oplog_dump_buf_size')
 
+        self.do_id_copy = kwargs.get('do_id_copy')
+
         if not self.oplog.find_one():
             err_msg = 'OplogThread: No oplog for thread:'
             LOG.warning('%s %s' % (err_msg, self.primary_client))
@@ -578,6 +580,8 @@ class OplogThread(threading.Thread):
         # 'i' indicates an insert. 'o' field is the doc to be inserted.
         if entry['op'] == 'i':
             entry['o'] = filter_fields(entry_o, fields)
+            if self.do_id_copy:
+                entry['o']['idCopy'] = entry['o']['_id']
         # 'u' indicates an update. The 'o' field describes an update spec
         # if '$set' or '$unset' are present.
         elif entry['op'] == 'u' and ('$set' in entry_o or '$unset' in entry_o):
@@ -739,6 +743,8 @@ class OplogThread(threading.Thread):
                             dump_cancelled[0] = True
                             raise StopIteration
                         last_id = doc["_id"]
+                        if self.do_id_copy:
+                            doc["idCopy"] = doc["_id"]
                         yield self.aggregate_doc(doc)
                     break
                 except (pymongo.errors.AutoReconnect,
