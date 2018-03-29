@@ -31,6 +31,8 @@ import threading
 import pickle
 import os
 
+from slackclient import SlackClient
+
 from pymongo import CursorType, errors as pymongo_errors
 
 from mongo_connector import errors, util, constants
@@ -146,6 +148,8 @@ class OplogThread(threading.Thread):
 
         self.do_id_copy = kwargs.get('do_id_copy')
 
+        self.reported_to_slack = False
+
         if not self.oplog.find_one():
             err_msg = 'OplogThread: No oplog for thread:'
             LOG.warning('%s %s' % (err_msg, self.primary_client))
@@ -259,7 +263,21 @@ class OplogThread(threading.Thread):
             t.start()
 
     def entry_spewer(self):
-        def ahead_enough():
+        def close_to_head_enough():
+            if self.last_ts is None:
+                return False
+
+            latest_oplog_ts = self.get_last_oplog_timestamp()
+            latest_oplog_ts_long = util.bson_ts_to_long(latest_oplog_ts)
+            last_ts_long = util.bson_ts_to_long(self.last_ts)
+            diff = latest_oplog_ts_long - last_ts_long
+            diff >>= 32
+            if diff <= constants.MIN_SEC_BEFORE_HEAD:
+                return True
+
+            return False
+
+        def ahead_of_tail_enough():
             if self.last_ts is None:
                 return False
 
@@ -281,7 +299,7 @@ class OplogThread(threading.Thread):
 
         while self.running:
             if self.cursor is None:
-                if ahead_enough():
+                if ahead_of_tail_enough():
                     LOG.always("Ahead enough of mongo oldest oplog entry")
                     oldest_oplog_ts = self.get_oldest_oplog_timestamp()
                     self.cursor = self.get_oplog_cursor(oldest_oplog_ts)
@@ -300,6 +318,10 @@ class OplogThread(threading.Thread):
                     pass
             elif self.cursor.alive and self.running:
                 entry = next(self.cursor)
+                if not self.reported_to_slack and close_to_head_enough():
+                    
+                    self.reported_to_slack = True
+
                 yield entry
             else:
                 LOG.always("Entry spewer stop iteration")

@@ -204,6 +204,7 @@ class Connector(threading.Thread):
             oplog_dump_file_name=config['oplogDumpFileName'],
             min_ahead_time=config['minAheadTime'],
             oplog_dump_buf_size=config['oplogDumpBufSize'],
+            slack_token=config['slackToken'],
             collection_dump=(not config['noDump']),
             batch_size=config['batchSize'],
             continue_on_error=config['continueOnError'],

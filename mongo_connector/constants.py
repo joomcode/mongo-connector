@@ -58,3 +58,6 @@ DEFAULT_META_COLLECTION_CAP_SIZE = 5 * 1024 * 1024
 DEFAULT_MIN_AHEAD_TIME = 1200
 # Size of a buffer written to oplog dump file
 DEFAULT_OPLOG_DUMP_BUFFER_SIZE = 10000
+
+# Before reporting to Slack
+MIN_SEC_BEFORE_HEAD = 60
