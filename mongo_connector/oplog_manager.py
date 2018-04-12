@@ -146,6 +146,9 @@ class OplogThread(threading.Thread):
 
         self.do_id_copy = kwargs.get('do_id_copy')
 
+        # for logging purposes
+        self.oplog_lag_cnt = 0
+
         if not self.oplog.find_one():
             err_msg = 'OplogThread: No oplog for thread:'
             LOG.warning('%s %s' % (err_msg, self.primary_client))
@@ -258,6 +261,21 @@ class OplogThread(threading.Thread):
             t = threading.Thread(target=dump_oplog_entries, args=(dump_cursor,))
             t.start()
 
+    def log_oplog_lag(self):
+        if self.oplog_lag_cnt is None:
+            self.oplog_lag_cnt = 0
+        if self.last_ts is None:
+            return
+
+        self.oplog_lag_cnt = self.oplog_lag_cnt + 1
+
+        if self.oplog_lag_cnt % 500 == 0:
+            latest_oplog_ts_long = util.bson_ts_to_long(self.get_last_oplog_timestamp())
+            last_ts_long = util.bson_ts_to_long(self.last_ts)
+            lag = latest_oplog_ts_long - last_ts_long
+            lag >>= 32
+            LOG.always("Current oplog entry is behind of oplog head by %d seconds" % lag)
+
     def entry_spewer(self):
         def ahead_enough():
             if self.last_ts is None:
@@ -276,7 +294,6 @@ class OplogThread(threading.Thread):
         if self.cursor is None:
             LOG.always("Oplog is too much ahead. Start reading from oplog dump")
         else:
-            LOG.always("Oplog is caught right after initial sync. Stopping oplog dump...")
             self.oplog_dump_running = False
 
         while self.running:
@@ -288,9 +305,7 @@ class OplogThread(threading.Thread):
                     self.oplog_dump_running = False
                     continue
                 try:
-                    # LOG.always("Loading oplog dump buffer")
                     buffer = pickle.load(self.oplog_dump_file_r)
-                    # LOG.always("Loaded oplog dump buffer with len %s", len(buffer))
                     while len(buffer) > 0:
                         entry = buffer.pop(0)
                         yield entry
@@ -302,7 +317,6 @@ class OplogThread(threading.Thread):
                 entry = next(self.cursor)
                 yield entry
             else:
-                LOG.always("Entry spewer stop iteration")
                 raise StopIteration
 
     @log_fatal_exceptions
@@ -345,7 +359,7 @@ class OplogThread(threading.Thread):
                 LOG.always("OplogThread: about to process new oplog entries")
                 while (self.cursor is None or self.cursor.alive) and \
                         self.running:
-                    LOG.always("OplogThread: Cursor is still"
+                    LOG.debug("OplogThread: Cursor is still"
                               " alive and thread is still running.")
                     for n, entry in enumerate(self.entry_spewer()):
                         # Break out if this thread should stop
@@ -366,12 +380,6 @@ class OplogThread(threading.Thread):
 
                         # Sync the current oplog operation
                         operation = entry['op']
-
-                        if self.cursor is None:
-                            # from dump
-                            LOG.always("Op from dump: %s" % operation)
-                            if operation == 'i':
-                                LOG.always("Entry from dump: %s" % entry)
 
                         ns = entry['ns']
                         timestamp = util.bson_ts_to_long(entry['ts'])
@@ -436,6 +444,7 @@ class OplogThread(threading.Thread):
                         LOG.debug("OplogThread: Doc is processed.")
 
                         self.last_ts = entry['ts']
+                        self.log_oplog_lag()
 
                         # update timestamp per batch size
                         # n % -1 (default for self.batch_size) == 0 for all n
