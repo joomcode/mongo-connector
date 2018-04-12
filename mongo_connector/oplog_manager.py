@@ -297,7 +297,7 @@ class OplogThread(threading.Thread):
             self.oplog_dump_running = False
 
         while self.running:
-            if self.cursor is None:
+            if self.cursor is None and self.do_oplog_dump:
                 if ahead_enough():
                     LOG.always("Ahead enough of mongo oldest oplog entry")
                     oldest_oplog_ts = self.get_oldest_oplog_timestamp()
