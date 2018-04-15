@@ -269,7 +269,7 @@ class OplogThread(threading.Thread):
 
         self.oplog_lag_cnt = self.oplog_lag_cnt + 1
 
-        if self.oplog_lag_cnt % 500 == 0:
+        if self.oplog_lag_cnt % 3000 == 0:
             latest_oplog_ts_long = util.bson_ts_to_long(self.get_last_oplog_timestamp())
             last_ts_long = util.bson_ts_to_long(self.last_ts)
             lag = latest_oplog_ts_long - last_ts_long
