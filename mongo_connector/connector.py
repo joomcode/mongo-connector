@@ -383,7 +383,8 @@ class Connector(threading.Thread):
             # Establish a connection to the replica set as a whole
             self.main_conn.close()
             self.main_conn = self.create_authed_client(
-                replicaSet=is_master['setName'])
+                replicaSet=is_master['setName'],
+                aux_uri_options="&readPreference=secondary&readPreferenceTags=role:hidden")
 
             self.update_version_from_client(self.main_conn)
 
