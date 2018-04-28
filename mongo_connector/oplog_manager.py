@@ -759,7 +759,7 @@ class OplogThread(threading.Thread):
 
         LOG.always("OplogThread: Dumping set of collections %s " % dump_set)
 
-        def docs_to_dump(from_coll):
+        def doc_to_dump_with_sort(from_coll, order):
             last_id = None
             attempts = 0
             projection = self.namespace_config.projection(from_coll.full_name)
@@ -769,14 +769,14 @@ class OplogThread(threading.Thread):
                     cursor = retry_until_ok(
                         from_coll.find,
                         projection=projection,
-                        sort=[("_id", pymongo.ASCENDING)]
+                        sort=[("_id", order)]
                     )
                 else:
                     cursor = retry_until_ok(
                         from_coll.find,
                         {"_id": {"$gt": last_id}},
                         projection=projection,
-                        sort=[("_id", pymongo.ASCENDING)]
+                        sort=[("_id", order)]
                     )
                 try:
                     for doc in cursor:
@@ -794,6 +794,12 @@ class OplogThread(threading.Thread):
                         pymongo.errors.OperationFailure):
                     attempts += 1
                     time.sleep(1)
+
+        def docs_to_dump(from_coll):
+            for doc in doc_to_dump_with_sort(from_coll, pymongo.DESCENDING):
+                yield doc
+            for doc in doc_to_dump_with_sort(from_coll, pymongo.ASCENDING):
+                yield doc
 
         def upsert_each(dm):
             num_failed = 0
