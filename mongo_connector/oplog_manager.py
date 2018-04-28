@@ -31,6 +31,8 @@ import threading
 import pickle
 import os
 
+from slackclient import SlackClient
+
 from pymongo import CursorType, errors as pymongo_errors
 
 from mongo_connector import errors, util, constants
@@ -146,6 +148,10 @@ class OplogThread(threading.Thread):
 
         self.do_id_copy = kwargs.get('do_id_copy')
 
+        self.sc = SlackClient(kwargs.get('slack_token'))
+
+        self.index_name = kwargs.get('index_name')
+
         # for logging purposes
         self.oplog_lag_cnt = 0
 
@@ -215,6 +221,16 @@ class OplogThread(threading.Thread):
             return True, False
         return False, is_gridfs_file
 
+    def post_message_to_slack(self, message):
+        final_message = "*%s*: %s" % (self.index_name, message)
+        self.sc.api_call(
+            "chat.postMessage",
+            link_names=1,
+            channel="mongo-connector",
+            text=final_message,
+            username="mongo-connector"
+        )
+
     def start_oplog_dump(self):
         def dump_oplog_entries(cursor):
             buffer = []
@@ -269,12 +285,15 @@ class OplogThread(threading.Thread):
 
         self.oplog_lag_cnt = self.oplog_lag_cnt + 1
 
-        if self.oplog_lag_cnt % 3000 == 0:
+        if self.oplog_lag_cnt % 17000 == 0:
             latest_oplog_ts_long = util.bson_ts_to_long(self.get_last_oplog_timestamp())
             last_ts_long = util.bson_ts_to_long(self.last_ts)
             lag = latest_oplog_ts_long - last_ts_long
             lag >>= 32
-            LOG.always("Current oplog entry is behind of oplog head by %d seconds" % lag)
+            message = "Current oplog entry is behind of oplog head by %d seconds" % lag
+            LOG.always(message)
+            if lag > constants.HOUR:
+                self.post_message_to_slack(message)
 
     def entry_spewer(self):
         def ahead_enough():
@@ -292,17 +311,21 @@ class OplogThread(threading.Thread):
             return False
 
         if self.cursor is None:
-            LOG.always("Oplog is too much ahead. Start reading from oplog dump")
+            message = "Oplog is too much ahead. Start reading from oplog dump"
+            LOG.always(message)
+            self.post_message_to_slack(message)
         else:
             self.oplog_dump_running = False
 
         while self.running:
             if self.cursor is None and self.do_oplog_dump:
                 if ahead_enough():
-                    LOG.always("Ahead enough of mongo oldest oplog entry")
+                    message = "ahead enough of mongo oldest oplog entry"
+                    LOG.always(message)
                     oldest_oplog_ts = self.get_oldest_oplog_timestamp()
                     self.cursor = self.get_oplog_cursor(oldest_oplog_ts)
                     self.oplog_dump_running = False
+                    self.post_message_to_slack(message)
                     continue
                 try:
                     buffer = pickle.load(self.oplog_dump_file_r)
@@ -326,9 +349,12 @@ class OplogThread(threading.Thread):
         ReplicationLagLogger(self, 30).start()
         LOG.always("OplogThread: Run thread started (6)")
 
+        self.post_message_to_slack("mongo connector has just started")
+
         if self.do_oplog_dump:
             LOG.always("OplogThread: Starting oplog dump (ns solved 2)")
             self.start_oplog_dump()
+            self.post_message_to_slack("oplog dump has just started")
             LOG.always("OplogThread: Oplog dump started")
 
         while self.running is True:
@@ -340,7 +366,9 @@ class OplogThread(threading.Thread):
                 effect = self.do_oplog_dump and \
                          "trying to recover with disk!" or \
                          "cannot recover"
-                LOG.always('%s %s %s' % (err_msg, effect, self.oplog))
+                message = '%s %s %s' % (err_msg, effect, self.oplog)
+                LOG.always(message)
+                self.post_message_to_slack(message)
                 if not self.do_oplog_dump:
                     self.running = False
                     continue
@@ -477,6 +505,12 @@ class OplogThread(threading.Thread):
                       "upserted: %d, updated: %d"
                       % (remove_inc, upsert_inc, update_inc))
             time.sleep(2)
+
+        interested = "s.krestianskov"
+        if self.index_name.startswith("review"):
+            interested = "myasnov"
+
+        self.post_message_to_slack(":thinking_face: @%s oplog is finishing for some reason (please investigate the problem)" % interested)
 
     def join(self):
         """Stop this thread from managing the oplog.

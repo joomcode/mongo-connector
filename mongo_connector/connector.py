@@ -201,6 +201,8 @@ class Connector(threading.Thread):
             oplog_checkpoint=os.path.abspath(config['oplogFile']),
             do_oplog_dump=config['doOplogDump'],
             do_id_copy=config['doIdCopy'],
+            slack_token=config['slackToken'],
+            index_name=config['indexName'],
             oplog_dump_file_name=config['oplogDumpFileName'],
             min_ahead_time=config['minAheadTime'],
             oplog_dump_buf_size=config['oplogDumpBufSize'],
@@ -550,6 +552,11 @@ def get_config_options():
         "If specified, this flag will ensure that "
         "copy of id field is created."
     )
+
+    slack_token = add_option(config_key="slackToken", default="", type=str)
+    slack_token.add_cli("--slack-token", type="str")
+    index_name = add_option(config_key="indexName", default="", type=str)
+    index_name.add_cli("--index-name", type="str")
 
     oplog_dump_file_name = add_option(
         config_key="oplogDumpFileName",
