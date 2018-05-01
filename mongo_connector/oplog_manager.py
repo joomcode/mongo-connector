@@ -838,9 +838,9 @@ class OplogThread(threading.Thread):
                     total_docs = retry_until_ok(from_coll.count)
                     mapped_ns = self.namespace_config.map_namespace(
                             namespace)
-                    LOG.always("Bulk upserting approximately %d docs from "
-                             "collection '%s'",
-                             total_docs, namespace)
+                    message = "Bulk upserting approximately %d docs from collection '%s'" % (total_docs, namespace)
+                    LOG.always(message)
+                    self.post_message_to_slack(message)
                     dm.bulk_upsert(docs_to_dump(from_coll),
                                    mapped_ns, long_ts)
             except Exception:
