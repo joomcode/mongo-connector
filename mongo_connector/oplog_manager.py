@@ -23,12 +23,11 @@ except ImportError:
     import queue
 import sys
 import time
-import threading
 
 import pymongo
 
 import threading
-import pickle
+import cPickle as pickle
 import os
 
 from slackclient import SlackClient
@@ -290,7 +289,7 @@ class OplogThread(threading.Thread):
             last_ts_long = util.bson_ts_to_long(self.last_ts)
             lag = latest_oplog_ts_long - last_ts_long
             lag >>= 32
-            message = "Current oplog entry is behind of oplog head by %d seconds" % lag
+            message = "current oplog entry is behind of oplog head by %d seconds" % lag
             LOG.always(message)
             if lag > constants.HOUR:
                 self.post_message_to_slack(message)
@@ -311,7 +310,7 @@ class OplogThread(threading.Thread):
             return False
 
         if self.cursor is None:
-            message = "Oplog is too much ahead. Start reading from oplog dump"
+            message = "oplog is too much ahead. Start reading from oplog dump"
             LOG.always(message)
             self.post_message_to_slack(message)
         else:
@@ -372,6 +371,7 @@ class OplogThread(threading.Thread):
                 if not self.do_oplog_dump:
                     self.running = False
                     continue
+            self.post_message_to_slack("cursor is initialized (collection is dumped or ts is used)")
 
             if self.cursor is not None and cursor_empty:
                 LOG.always("OplogThread: Last entry is the one we "
