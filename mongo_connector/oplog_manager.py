@@ -759,7 +759,7 @@ class OplogThread(threading.Thread):
 
         LOG.always("OplogThread: Dumping set of collections %s " % dump_set)
 
-        def doc_to_dump_with_sort(from_coll, order):
+        def doc_to_dump_with_sort(from_coll):
             last_id = None
             attempts = 0
             projection = self.namespace_config.projection(from_coll.full_name)
@@ -769,14 +769,14 @@ class OplogThread(threading.Thread):
                     cursor = retry_until_ok(
                         from_coll.find,
                         projection=projection,
-                        sort=[("_id", order)]
+                        sort=[("_id", pymongo.DESCENDING)]
                     )
                 else:
                     cursor = retry_until_ok(
                         from_coll.find,
-                        {"_id": {"$gt": last_id}},
+                        {"_id": {"$lt": last_id}},
                         projection=projection,
-                        sort=[("_id", order)]
+                        sort=[("_id", pymongo.DESCENDING)]
                     )
                 try:
                     for doc in cursor:
@@ -796,9 +796,11 @@ class OplogThread(threading.Thread):
                     time.sleep(1)
 
         def docs_to_dump(from_coll):
-            for doc in doc_to_dump_with_sort(from_coll, pymongo.DESCENDING):
-                yield doc
-            for doc in doc_to_dump_with_sort(from_coll, pymongo.ASCENDING):
+            dumped_count = 0
+            for doc in doc_to_dump_with_sort(from_coll):
+                dumped_count = dumped_count + 1
+                if dumped_count % 100000 == 0:
+                    self.post_message_to_slack("extracted %d docs from mongodb for dump (last one is %s)" % (dumped_count, doc["_id"]))
                 yield doc
 
         def upsert_each(dm):
