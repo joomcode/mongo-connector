@@ -317,7 +317,7 @@ class OplogThread(threading.Thread):
             self.oplog_dump_running = False
 
         while self.running:
-            if self.cursor is None and self.do_oplog_dump:
+            if self.cursor is None and self.oplog_dump_running:
                 if ahead_enough():
                     message = "ahead enough of mongo oldest oplog entry"
                     LOG.always(message)
@@ -335,7 +335,7 @@ class OplogThread(threading.Thread):
                     LOG.always("EOF oplog dump")
                     self.running = False
                     pass
-            elif self.cursor.alive and self.running:
+            elif self.cursor is not None and self.cursor.alive and self.running:
                 entry = next(self.cursor)
                 yield entry
             else:
