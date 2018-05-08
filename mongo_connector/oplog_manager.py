@@ -804,6 +804,8 @@ class OplogThread(threading.Thread):
                         pymongo.errors.OperationFailure):
                     attempts += 1
                     time.sleep(1)
+                    message = "used %d attempt(s) to init cursor during collection dump with last_id %s" % (attempts, last_id)
+                    self.post_message_to_slack(message)
 
         def docs_to_dump(from_coll):
             dumped_count = 0
@@ -919,7 +921,9 @@ class OplogThread(threading.Thread):
         if not dump_success:
             err_msg = "OplogThread: Failed during dump collection"
             effect = "cannot recover!"
-            LOG.always('%s %s %s' % (err_msg, effect, self.oplog))
+            message = '%s %s %s' % (err_msg, effect, self.oplog)
+            LOG.always(message)
+            self.post_message_to_slack(message)
             self.running = False
             return None
 
