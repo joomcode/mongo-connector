@@ -784,8 +784,8 @@ class OplogThread(threading.Thread):
                 else:
                     cursor = retry_until_ok(
                         from_coll.find,
-                        {"_id": {"$lt": last_id}},
                         projection=projection,
+                        max=[("_id", last_id)],
                         sort=[("_id", pymongo.DESCENDING)]
                     )
                 try:
