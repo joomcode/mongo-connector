@@ -232,6 +232,7 @@ class OplogThread(threading.Thread):
 
     def start_oplog_dump(self):
         def dump_oplog_entries(cursor):
+            dumped_buf_cnt = 0
             buffer = []
             while cursor.alive and self.running and self.oplog_dump_running:
                 try:
@@ -245,22 +246,31 @@ class OplogThread(threading.Thread):
                         if len(buffer) == self.oplog_dump_buf_size:
                             pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
                             buffer = buffer[:0]
+
+                            dumped_buf_cnt = dumped_buf_cnt + 1
+                            if dumped_buf_cnt % 17 == 0:
+                                self.post_message_to_slack("Dumped %d buffers (of size %d) with oplog entries" % (dumped_buf_cnt, self.oplog_dump_buf_size))
+
                 except (pymongo.errors.AutoReconnect,
                         pymongo.errors.OperationFailure,
                         pymongo.errors.ConfigurationError):
-                            LOG.always(
-                                "Oplog dump cursor closed due to an exception. "
-                                "Will attempt to reconnect.")
+                            message = "Oplog dump cursor closed due to an exception. Will attempt to reconnect."
+                            LOG.always(message)
+                            self.post_message_to_slack(message)
 
                 while not cursor.alive:
                     time.sleep(1)
                     cursor = self.get_oplog_cursor(last_doc_ts)
 
-            LOG.always("OplogDump thread finishing. Deleting oplog dump file")
+            message = "OplogDump thread finishing. Deleting oplog dump file"
+            LOG.always(message)
+            self.post_message_to_slack(message)
             try:
                 os.remove(self.oplog_dump_file_name)
             except OSError:
-                LOG.always("Error when removing oplog dump file")
+                message = "Error when removing oplog dump file"
+                LOG.always(message)
+                self.post_message_to_slack(message)
                 pass
 
         timestamp = retry_until_ok(self.get_last_oplog_timestamp)
@@ -321,18 +331,18 @@ class OplogThread(threading.Thread):
                 if ahead_enough():
                     message = "ahead enough of mongo oldest oplog entry"
                     LOG.always(message)
+                    self.post_message_to_slack(message)
                     oldest_oplog_ts = self.get_oldest_oplog_timestamp()
                     self.cursor = self.get_oplog_cursor(oldest_oplog_ts)
                     self.oplog_dump_running = False
-                    self.post_message_to_slack(message)
                     continue
                 try:
                     buffer = pickle.load(self.oplog_dump_file_r)
                     while len(buffer) > 0:
                         entry = buffer.pop(0)
                         yield entry
-                except EOFError:
-                    LOG.always("EOF oplog dump")
+                except EOFError as e:
+                    LOG.always("Error reading oplog dump: %s" % e)
                     self.running = False
                     pass
             elif self.cursor is not None and self.cursor.alive and self.running:
