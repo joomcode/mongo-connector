@@ -267,7 +267,8 @@ class OplogThread(threading.Thread):
             LOG.always(message)
             self.post_message_to_slack(message)
             try:
-                os.remove(self.oplog_dump_file_name)
+                ''' TODO: uncomment next line (it's commented for debugging purposes) '''
+                # os.remove(self.oplog_dump_file_name)
             except OSError:
                 message = "Error when removing oplog dump file"
                 LOG.always(message)
@@ -339,8 +340,7 @@ class OplogThread(threading.Thread):
                     continue
                 try:
                     buffer = pickle.load(self.oplog_dump_file_r)
-                    while len(buffer) > 0:
-                        entry = buffer.pop(0)
+                    for entry in buffer:
                         yield entry
                 except EOFError as e:
                     LOG.always("Error reading oplog dump: %s" % e)
