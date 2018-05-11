@@ -446,7 +446,7 @@ class Connector(threading.Thread):
 
                     shard_conn = self.create_authed_client(
                         hosts, replicaSet=repl_set,
-                        aux_uri_options="&readPreference=secondary")
+                        aux_uri_options="&readPreference=secondary&readPreferenceTags=role:main")
                     self.update_version_from_client(shard_conn)
                     oplog = OplogThread(
                         shard_conn, self.doc_managers, self.oplog_progress,
