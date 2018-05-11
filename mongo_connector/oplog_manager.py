@@ -234,6 +234,7 @@ class OplogThread(threading.Thread):
         def dump_oplog_entries(cursor):
             dumped_buf_cnt = 0
             buffer = []
+            last_doc_ts = None
             while cursor.alive and self.running and self.oplog_dump_running:
                 try:
                     for n, entry in enumerate(cursor):
@@ -248,8 +249,8 @@ class OplogThread(threading.Thread):
                             buffer = buffer[:0]
 
                             dumped_buf_cnt = dumped_buf_cnt + 1
-                            if dumped_buf_cnt % 17 == 0:
-                                self.post_message_to_slack("Dumped %d buffers (of size %d) with oplog entries" % (dumped_buf_cnt, self.oplog_dump_buf_size))
+                            if dumped_buf_cnt % 3 == 0:
+                                self.post_message_to_slack("Dumped %d buffers (of size %d) with oplog entries, last ts %s" % (dumped_buf_cnt, self.oplog_dump_buf_size, last_doc_ts))
 
                 except (pymongo.errors.AutoReconnect,
                         pymongo.errors.OperationFailure,
@@ -520,7 +521,7 @@ class OplogThread(threading.Thread):
         if self.index_name.startswith("review"):
             interested = "myasnov"
 
-        self.post_message_to_slack(":thinking_face: @%s oplog is finishing for some reason (please investigate the problem)" % interested)
+        self.post_message_to_slack(":thinking_face: @%s mongo connector for shard is finishing for some reason (please investigate the problem)" % interested)
 
     def join(self):
         """Stop this thread from managing the oplog.
