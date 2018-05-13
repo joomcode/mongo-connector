@@ -322,6 +322,12 @@ class OplogThread(threading.Thread):
             return False
 
         if self.cursor is None:
+            if not self.oplog_dump_running:
+                message = "cursor is not initialized with no oplog dump available"
+                LOG.always(message)
+                self.post_message_to_slack(message)
+                self.running = False
+                return
             message = "oplog is too much ahead. Start reading from oplog dump"
             LOG.always(message)
             self.post_message_to_slack(message)
@@ -332,8 +338,7 @@ class OplogThread(threading.Thread):
             if self.cursor is None and self.oplog_dump_running:
                 if ahead_enough():
                     self.post_message_to_slack(message)
-                    oldest_oplog_ts = self.get_oldest_oplog_timestamp()
-                    self.cursor = self.get_oplog_cursor(oldest_oplog_ts)
+                    self.cursor = self.get_oplog_cursor(self.last_ts)
                     self.oplog_dump_running = False
                     message = "ahead enough of mongo oldest oplog entry, stopping oplog dump, new cursor is %s" % self.cursor
                     LOG.always(message)
@@ -374,7 +379,7 @@ class OplogThread(threading.Thread):
             # we've fallen too far behind
             if self.cursor is None and self.checkpoint is not None:
                 err_msg = "OplogThread: Last entry no longer in oplog"
-                effect = self.do_oplog_dump and \
+                effect = self.oplog_dump_running and \
                          "trying to recover with disk!" or \
                          "cannot recover"
                 message = '%s %s %s' % (err_msg, effect, self.oplog)
