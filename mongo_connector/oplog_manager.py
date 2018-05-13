@@ -268,7 +268,7 @@ class OplogThread(threading.Thread):
             self.post_message_to_slack(message)
             try:
                 ''' TODO: uncomment next line (it's commented for debugging purposes) '''
-                # os.remove(self.oplog_dump_file_name)
+                os.remove(self.oplog_dump_file_name)
             except OSError:
                 message = "Error when removing oplog dump file"
                 LOG.always(message)
@@ -331,12 +331,13 @@ class OplogThread(threading.Thread):
         while self.running:
             if self.cursor is None and self.oplog_dump_running:
                 if ahead_enough():
-                    message = "ahead enough of mongo oldest oplog entry"
-                    LOG.always(message)
                     self.post_message_to_slack(message)
                     oldest_oplog_ts = self.get_oldest_oplog_timestamp()
                     self.cursor = self.get_oplog_cursor(oldest_oplog_ts)
                     self.oplog_dump_running = False
+                    message = "ahead enough of mongo oldest oplog entry, stopping oplog dump, new cursor is %s" % self.cursor
+                    LOG.always(message)
+                    self.post_message_to_slack(message)
                     continue
                 try:
                     buffer = pickle.load(self.oplog_dump_file_r)
