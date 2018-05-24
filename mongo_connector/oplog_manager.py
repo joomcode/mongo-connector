@@ -815,11 +815,17 @@ class OplogThread(threading.Thread):
                     self.post_message_to_slack(message)
 
         def docs_to_dump(from_coll):
+            # report of dumped_count in logarithmic scale
+            cur_delim_count = 0
+            delim_size = 100000
             dumped_count = 0
             for doc in doc_to_dump_with_sort(from_coll):
+                cur_delim_count = cur_delim_count + 1
                 dumped_count = dumped_count + 1
-                if dumped_count % 100000 == 0:
+                if cur_delim_count == delim_size:
                     self.post_message_to_slack("extracted %d docs from mongodb for dump (last one is %s)" % (dumped_count, doc["_id"]))
+                    cur_delim_count = 0
+                    delim_size = delim_size * 2
                 yield doc
 
         def upsert_each(dm):
