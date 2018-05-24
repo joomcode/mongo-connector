@@ -386,7 +386,7 @@ class Connector(threading.Thread):
             self.main_conn.close()
             self.main_conn = self.create_authed_client(
                 replicaSet=is_master['setName'],
-                aux_uri_options="&readPreference=secondaryPreferred&readPreferenceTags=role:hidden")
+                aux_uri_options="&readPreference=secondaryPreferred&readPreferenceTags=role:main")
 
             self.update_version_from_client(self.main_conn)
 
