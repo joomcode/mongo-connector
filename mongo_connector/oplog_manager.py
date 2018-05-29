@@ -524,7 +524,7 @@ class OplogThread(threading.Thread):
             time.sleep(2)
 
         interested = "s.krestianskov"
-        if self.index_name.startswith("review"):
+        if "review" in self.index_name:
             interested = "myasnov"
 
         self.post_message_to_slack(":thinking_face: @%s mongo connector for shard is finishing for some reason (please investigate the problem)" % interested)
