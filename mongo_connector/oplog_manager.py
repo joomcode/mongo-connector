@@ -232,7 +232,6 @@ class OplogThread(threading.Thread):
 
     def start_oplog_dump(self):
         def dump_oplog_entries(cursor):
-            dumped_buf_cnt = 0
             buffer = []
             last_doc_ts = None
             while cursor.alive and self.running and self.oplog_dump_running:
@@ -247,10 +246,6 @@ class OplogThread(threading.Thread):
                         if len(buffer) == self.oplog_dump_buf_size:
                             pickle.dump(buffer, self.oplog_dump_file_w, pickle.HIGHEST_PROTOCOL)
                             buffer = buffer[:0]
-
-                            dumped_buf_cnt = dumped_buf_cnt + 1
-                            if dumped_buf_cnt % 3 == 0:
-                                self.post_message_to_slack("Dumped %d buffers (of size %d) with oplog entries, last ts %s" % (dumped_buf_cnt, self.oplog_dump_buf_size, last_doc_ts))
 
                 except (pymongo.errors.AutoReconnect,
                         pymongo.errors.OperationFailure,
