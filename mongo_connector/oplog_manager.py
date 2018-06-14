@@ -132,8 +132,12 @@ class OplogThread(threading.Thread):
 
         self.do_oplog_dump = kwargs.get('do_oplog_dump')
         self.oplog_dump_file_name = kwargs.get('oplog_dump_file_name')
+
+        self.shard_name = ""
         if shard_id is not None:
+            self.shard_name = str(shard_id)
             self.oplog_dump_file_name += "." + str(shard_id)
+
         self.oplog_dump_file_w = open(self.oplog_dump_file_name, "ab")
         self.oplog_dump_file_r = open(self.oplog_dump_file_name, "rb")
         # Timestamp of last exported oplog entry
@@ -221,7 +225,7 @@ class OplogThread(threading.Thread):
         return False, is_gridfs_file
 
     def post_message_to_slack(self, message):
-        final_message = "*%s*: %s" % (self.index_name, message)
+        final_message = "*%s* (shard %s): %s" % (self.index_name, self.shard_name, message)
         self.sc.api_call(
             "chat.postMessage",
             link_names=1,
