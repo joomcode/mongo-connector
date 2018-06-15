@@ -293,9 +293,8 @@ class OplogThread(threading.Thread):
         if self.last_ts is None:
             return
 
-        self.oplog_lag_cnt = self.oplog_lag_cnt + 1
 
-        if self.oplog_lag_cnt % 17000 == 0:
+        if self.oplog_lag_cnt % 5000 == 0:
             latest_oplog_ts_long = util.bson_ts_to_long(self.get_last_oplog_timestamp())
             last_ts_long = util.bson_ts_to_long(self.last_ts)
             lag = latest_oplog_ts_long - last_ts_long
@@ -304,6 +303,8 @@ class OplogThread(threading.Thread):
             LOG.always(message)
             if lag > constants.HOUR:
                 self.post_message_to_slack(message)
+
+        self.oplog_lag_cnt = self.oplog_lag_cnt + 1
 
     def entry_spewer(self):
         def ahead_enough():
