@@ -635,10 +635,11 @@ class OplogThread(threading.Thread):
         if '$v' in entry_o:
             entry_o.pop('$v')
 
-        self.aggregate_doc(entry_o)
+        to_be_aggregated = None
 
         # 'i' indicates an insert. 'o' field is the doc to be inserted.
         if entry['op'] == 'i':
+            to_be_aggregated = entry['o']
             entry['o'] = filter_fields(entry_o, fields)
             if self.do_id_copy:
                 entry['o']['idCopy'] = entry['o']['_id']
@@ -646,6 +647,7 @@ class OplogThread(threading.Thread):
         # if '$set' or '$unset' are present.
         elif entry['op'] == 'u' and ('$set' in entry_o or '$unset' in entry_o):
             if '$set' in entry_o:
+                to_be_aggregated = entry['o']["$set"]
                 entry['o']["$set"] = filter_fields(
                     entry_o["$set"], fields, update=True)
             if '$unset' in entry_o:
@@ -661,7 +663,11 @@ class OplogThread(threading.Thread):
         # 'u' indicates an update. The 'o' field is the replacement document
         # if no '$set' or '$unset' are present.
         elif entry['op'] == 'u':
+            to_be_aggregated = entry['o']["$set"]
             entry['o'] = filter_fields(entry_o, fields)
+
+        if to_be_aggregated is not None:
+            self.aggregate_doc(to_be_aggregated)
 
         return entry
 
